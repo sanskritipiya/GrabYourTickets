@@ -1,14 +1,33 @@
 import React, { useState } from "react";
-import { X } from "lucide-react";
+import { X, Upload } from "lucide-react";
 
 export default function HeroSlideForm({ slide, onSubmit, onCancel }) {
   const [formData, setFormData] = useState({
     title: slide?.title || "",
     subtitle: slide?.subtitle || "",
-    image: slide?.image || "",
-    cta: slide?.cta || "",
+    description: slide?.description || "",
+    backgroundImage: slide?.backgroundImage || "",
+    ctaText: slide?.ctaText || "Learn More",
+    ctaLink: slide?.ctaLink || "#",
     isActive: slide?.isActive !== undefined ? slide.isActive : true,
   });
+
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState(slide?.backgroundImage || "");
+
+  // Handle image upload and preview
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result);
+        setFormData((prev) => ({ ...prev, backgroundImage: reader.result }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -56,39 +75,76 @@ export default function HeroSlideForm({ slide, onSubmit, onCancel }) {
               }
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 bg-white"
               placeholder="Enter subtitle"
-              required
             />
           </div>
 
           <div>
             <label className="block text-sm font-medium mb-2 text-gray-700">
-              Image URL
+              Description
             </label>
-            <input
-              type="text"
-              value={formData.image}
+            <textarea
+              value={formData.description}
               onChange={(e) =>
-                setFormData({ ...formData, image: e.target.value })
+                setFormData({ ...formData, description: e.target.value })
               }
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 bg-white"
-              placeholder="https://..."
-              required
+              placeholder="Enter description"
+              rows="3"
             />
           </div>
 
           <div>
             <label className="block text-sm font-medium mb-2 text-gray-700">
-              Call to Action
+              Background Image
+            </label>
+            <div className="flex items-start gap-4">
+              <div className="flex-1">
+                <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
+                  <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                    <Upload className="w-8 h-8 mb-2 text-gray-500" />
+                    <p className="text-sm text-gray-500">
+                      <span className="font-semibold">Click to upload</span> or drag and drop
+                    </p>
+                    <p className="text-xs text-gray-500">PNG, JPG or WEBP (MAX. 5MB)</p>
+                  </div>
+                  <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} />
+                </label>
+              </div>
+              {imagePreview && (
+                <div className="w-32 h-32 border border-gray-300 rounded-lg overflow-hidden">
+                  <img src={imagePreview || "/placeholder.svg"} alt="Preview" className="w-full h-full object-cover" />
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2 text-gray-700">
+              Call to Action Text
             </label>
             <input
               type="text"
-              value={formData.cta}
+              value={formData.ctaText}
               onChange={(e) =>
-                setFormData({ ...formData, cta: e.target.value })
+                setFormData({ ...formData, ctaText: e.target.value })
               }
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 bg-white"
-              placeholder="Book Now"
-              required
+              placeholder="Learn More"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2 text-gray-700">
+              Call to Action Link
+            </label>
+            <input
+              type="text"
+              value={formData.ctaLink}
+              onChange={(e) =>
+                setFormData({ ...formData, ctaLink: e.target.value })
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 bg-white"
+              placeholder="#"
             />
           </div>
 

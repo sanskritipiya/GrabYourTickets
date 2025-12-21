@@ -145,16 +145,16 @@ export default function AdminMovies() {
           <p className="text-gray-600">No movies found. Add your first movie!</p>
         </div>
       ) : (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {movies.map((movie) => (
-            <MovieCard
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {movies.map((movie) => (
+          <MovieCard
               key={movie._id || movie.id}
-              movie={movie}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-            />
-          ))}
-        </div>
+            movie={movie}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+          />
+        ))}
+      </div>
       )}
     </div>
   );

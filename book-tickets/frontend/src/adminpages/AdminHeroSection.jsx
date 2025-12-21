@@ -1,39 +1,40 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Plus } from "lucide-react";
+import axios from "axios";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import HeroSlideForm from "../components/AdminHeroForm";
 import HeroSlideCard from "../components/AdminHeroSlideCard";
 
-
 export default function AdminHeroSection() {
-  const [heroSlides, setHeroSlides] = useState([
-    {
-      id: 1,
-      title: "Now Showing: Inception",
-      subtitle: "Experience the dream within a dream",
-      image: "/placeholder.svg?height=400&width=1200",
-      cta: "Book Now",
-      isActive: true,
-    },
-    {
-      id: 2,
-      title: "Coming Soon: Avatar 3",
-      subtitle: "The journey continues",
-      image: "/placeholder.svg?height=400&width=1200",
-      cta: "Get Notified",
-      isActive: true,
-    },
-    {
-      id: 3,
-      title: "Special Offer: 20% Off",
-      subtitle: "Book 4 tickets and get 20% discount",
-      image: "/placeholder.svg?height=400&width=1200",
-      cta: "Claim Offer",
-      isActive: false,
-    },
-  ]);
-
+  const [heroSlides, setHeroSlides] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingSlide, setEditingSlide] = useState(null);
+
+  // Get auth token from localStorage
+  const getAuthToken = () => {
+    return localStorage.getItem("authToken") || localStorage.getItem("token");
+  };
+
+  // Fetch all heroes
+  const fetchHeroes = async () => {
+    try {
+      const response = await axios.get("http://localhost:3000/api/heroes");
+      if (response.data.success) {
+        setHeroSlides(response.data.data);
+      }
+    } catch (error) {
+      console.error("Error fetching heroes:", error);
+      toast.error("Failed to load hero slides");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchHeroes();
+  }, []);
 
   const handleAdd = () => {
     setEditingSlide(null);
@@ -45,29 +46,94 @@ export default function AdminHeroSection() {
     setShowForm(true);
   };
 
-  const handleDelete = (id) => {
-    setHeroSlides(heroSlides.filter((s) => s.id !== id));
-  };
-
-  const handleToggleActive = (id) => {
-    setHeroSlides(
-      heroSlides.map((s) =>
-        s.id === id ? { ...s, isActive: !s.isActive } : s
-      )
-    );
-  };
-
-  const handleSubmit = (formData) => {
-    if (editingSlide) {
-      setHeroSlides(
-        heroSlides.map((s) =>
-          s.id === editingSlide.id ? { ...formData, id: s.id } : s
-        )
-      );
-    } else {
-      setHeroSlides([...heroSlides, { ...formData, id: Date.now() }]);
+  const handleDelete = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this hero slide?")) {
+      return;
     }
+
+    try {
+      const token = getAuthToken();
+      await axios.delete(`http://localhost:3000/api/heroes/${id}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      toast.success("Hero slide deleted successfully");
+      fetchHeroes();
+    } catch (error) {
+      console.error("Error deleting hero slide:", error);
+      toast.error(error.response?.data?.message || "Failed to delete hero slide");
+    }
+  };
+
+  const handleToggleActive = async (slide) => {
+    try {
+      const token = getAuthToken();
+      const headers = {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      };
+
+      const response = await axios.put(
+        `http://localhost:3000/api/heroes/${slide._id || slide.id}`,
+        { ...slide, isActive: !slide.isActive },
+        { headers }
+      );
+      if (response.data.success) {
+        toast.success(`Hero slide ${!slide.isActive ? "activated" : "deactivated"} successfully`);
+        fetchHeroes();
+      }
+    } catch (error) {
+      console.error("Error toggling hero slide status:", error);
+      toast.error(error.response?.data?.message || "Failed to update hero slide");
+    }
+  };
+
+  const handleSubmit = async (formData) => {
+    try {
+      const token = getAuthToken();
+      const headers = {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      };
+
+      if (editingSlide) {
+        // Update existing hero slide
+        const slideId = editingSlide._id || editingSlide.id;
+        const response = await axios.put(
+          `http://localhost:3000/api/heroes/${slideId}`,
+          formData,
+          { headers }
+        );
+        if (response.data.success) {
+          toast.success("Hero slide edited successfully");
+          setShowForm(false);
+          setEditingSlide(null);
+          fetchHeroes();
+        }
+      } else {
+        // Add new hero slide
+        const response = await axios.post(
+          "http://localhost:3000/api/heroes",
+          formData,
+          { headers }
+        );
+        if (response.data.success) {
+          toast.success("Hero slide added successfully");
+          setShowForm(false);
+          setEditingSlide(null);
+          fetchHeroes();
+        }
+      }
+    } catch (error) {
+      console.error("Error saving hero slide:", error);
+      toast.error(error.response?.data?.message || "Failed to save hero slide");
+    }
+  };
+
+  const handleCancel = () => {
     setShowForm(false);
+    setEditingSlide(null);
   };
 
   return (
@@ -90,25 +156,37 @@ export default function AdminHeroSection() {
         </button>
       </div>
 
+      <ToastContainer position="top-center" autoClose={1500} />
+
       {showForm && (
-            <HeroSlideForm
-              slide={editingSlide}
-              onSubmit={handleSubmit}
-              onCancel={() => setShowForm(false)}
-            />
+        <HeroSlideForm
+          slide={editingSlide}
+          onSubmit={handleSubmit}
+          onCancel={handleCancel}
+        />
       )}
 
-      <div className="space-y-4">
-        {heroSlides.map((slide) => (
-          <HeroSlideCard
-            key={slide.id}
-            slide={slide}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-            onToggleActive={handleToggleActive}
-          />
-        ))}
-      </div>
+      {loading ? (
+        <div className="text-center py-8">
+          <p className="text-gray-600">Loading hero slides...</p>
+        </div>
+      ) : heroSlides.length === 0 ? (
+        <div className="text-center py-8">
+          <p className="text-gray-600">No hero slides found. Add your first slide!</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {heroSlides.map((slide) => (
+            <HeroSlideCard
+              key={slide._id || slide.id}
+              slide={slide}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+              onToggleActive={handleToggleActive}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
