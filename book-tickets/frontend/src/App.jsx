@@ -14,11 +14,13 @@ import Navbar from "./components/Navbar";
 
 // Admin Pages
 import AdminDashboard from "./adminpages/AdminDashboard";
-import AddShows from "./adminpages/AddShows";
 import ViewBookings from "./adminpages/ViewBookings";
 import AdminHeroSection from "./adminpages/AdminHeroSection";
 import AdminMovies from "./adminpages/AdminMovies";
 import AdminSidebar from "./components/AdminSidebar"; 
+import SeatsPage from "./adminpages/AddSeats";
+import CinemasPage from "./adminpages/AddCinema";
+
 
 export default function App() {
   return (
@@ -35,9 +37,10 @@ export default function App() {
               <Route path="/movie/:id" element={<MovieDetail />} />
               <Route path="/theatres" element={<Theatres />} />
               <Route path="/new-releases" element={<NewReleases />} />
-              <Route path="/booking/:movieId" element={<Booking />} />
+              <Route path="/booking/:showId" element={<Booking />} />
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
+           
             </Routes>
           </>
         }
@@ -53,10 +56,11 @@ export default function App() {
               <Routes>
                 <Route path="" element={<Navigate to="dashboard" replace />} />
                 <Route path="dashboard" element={<AdminDashboard />} />
-                <Route path="add-shows" element={<AddShows />} />
                 <Route path="view-bookings" element={<ViewBookings />} />
                 <Route path="hero-section" element={<AdminHeroSection />} />
                 <Route path="movies" element={<AdminMovies />} />
+                <Route path="seats" element={<SeatsPage/>} />
+                <Route path="cinemas" element={<CinemasPage/>} />
               </Routes>
             </div>
           </div>

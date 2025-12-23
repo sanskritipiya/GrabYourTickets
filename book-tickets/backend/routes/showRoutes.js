@@ -1,22 +1,23 @@
 const express = require("express");
 const router = express.Router();
+
 const {
   addShow,
-  getShows,
+  getAllShows,
   getShowById,
   updateShow,
-  deleteShow,
+  deleteShow
 } = require("../controllers/showController");
+
 const { protect, admin } = require("../middleware/authMiddleware");
 
-// Public routes
-router.get("/", getShows);
+// PUBLIC
+router.get("/", getAllShows);
 router.get("/:id", getShowById);
 
-// Admin routes
+// ADMIN
 router.post("/", protect, admin, addShow);
 router.put("/:id", protect, admin, updateShow);
 router.delete("/:id", protect, admin, deleteShow);
 
 module.exports = router;
-

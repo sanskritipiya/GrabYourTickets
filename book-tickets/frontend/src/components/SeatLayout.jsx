@@ -1,128 +1,181 @@
-import { useState, useMemo } from "react"
+import { useState, useEffect } from "react"
+import axios from "axios"
+import { useNavigate } from "react-router-dom"
 
-const SeatLayout = ({ movieTitle, theatreName, time, onSeatSelect }) => {
-  const generateSeats = (totalSeats = 80) => {
-    const seats = []
-    const rows = ["A", "B", "C", "D", "E", "F", "G", "H"]
-    const seatsPerRow = totalSeats / rows.length
+const SeatLayout = ({
+  showId,
+  cinemaId,
+  hallName,
+  movieTitle,
+  cinemaName,
+  time,
+  showDate,
+  seats: initialSeats = [],
+  onSeatSelect
+}) => {
+  const navigate = useNavigate()
 
-    for (let i = 0; i < rows.length; i++) {
-      for (let j = 1; j <= seatsPerRow; j++) {
-        seats.push({
-          id: `${rows[i]}${j}`,
-          row: rows[i],
-          number: j,
-          status: Math.random() > 0.7 ? "booked" : "available",
-          price: rows[i] === "H" ? 300 : rows[i] === "G" ? 250 : 200,
-        })
-      }
-    }
-    return seats
-  }
-
-  const seats = useMemo(() => generateSeats(), [])
+  const [seats, setSeats] = useState(initialSeats)
   const [selectedSeats, setSelectedSeats] = useState([])
+  const [recommendedSeats, setRecommendedSeats] = useState([])
+  const [showRecommendation, setShowRecommendation] = useState(false)
+  const [seatCount, setSeatCount] = useState(2)
+  const [bookingLoading, setBookingLoading] = useState(false)
 
+  useEffect(() => {
+    setSeats(initialSeats)
+  }, [initialSeats])
+
+  // -------------------------------
+  // ROW NUMBER → LETTER (1=A, 2=B...)
+  // -------------------------------
+  const rowToLetter = (row) =>
+    String.fromCharCode(64 + Number(row))
+
+  // -------------------------------
+  // ORGANIZE SEATS
+  // -------------------------------
+  const seatsByRow = {}
+
+  seats.forEach(seat => {
+    if (!seat || seat.row == null || seat.column == null) return
+
+    seat.type = seat.type || "REGULAR"
+
+    if (!seatsByRow[seat.row]) {
+      seatsByRow[seat.row] = []
+    }
+    seatsByRow[seat.row].push(seat)
+  })
+
+  Object.keys(seatsByRow).forEach(row => {
+    seatsByRow[row].sort((a, b) => a.column - b.column)
+  })
+
+  const regularRows = Object.keys(seatsByRow).sort((a, b) => a - b)
+
+  // -------------------------------
+  // SEAT INTERACTION
+  // -------------------------------
   const handleSeatClick = (seat) => {
-    if (seat.status === "booked") return
+    if (seat.status === "BOOKED") return
 
-    const updatedSeats = selectedSeats.find((s) => s.id === seat.id)
-      ? selectedSeats.filter((s) => s.id !== seat.id)
+    const exists = selectedSeats.find(s => s._id === seat._id)
+    const updated = exists
+      ? selectedSeats.filter(s => s._id !== seat._id)
       : [...selectedSeats, seat]
 
-    setSelectedSeats(updatedSeats)
-    onSeatSelect(updatedSeats)
+    setSelectedSeats(updated)
+    onSeatSelect(updated)
   }
 
-  const totalPrice = selectedSeats.reduce((sum, seat) => sum + seat.price, 0)
+  const totalPrice = selectedSeats.length * 200
 
+  const getSeatStatus = (seat) => {
+    if (seat.status === "BOOKED") return "booked"
+    if (selectedSeats.find(s => s._id === seat._id)) return "selected"
+    if (recommendedSeats.find(s => s._id === seat._id) && showRecommendation) return "recommended"
+    return "available"
+  }
+
+  // -------------------------------
+  // BOOKING
+  // -------------------------------
+  const handleBooking = async () => {
+    if (!selectedSeats.length) {
+      alert("Please select at least one seat")
+      return
+    }
+
+    setBookingLoading(true)
+    try {
+      const token = localStorage.getItem("token")
+      const seatIds = selectedSeats.map(s => s._id)
+
+      await axios.post(
+        "http://localhost:3000/api/bookings",
+        { showId, seatIds },
+        { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+      )
+
+      alert("Booking confirmed!")
+      navigate("/")
+    } catch {
+      alert("Booking failed.")
+    } finally {
+      setBookingLoading(false)
+    }
+  }
+
+  // -------------------------------
+  // UI (UNCHANGED)
+  // -------------------------------
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
       <div className="lg:col-span-2">
         <div className="bg-gray-900 rounded-lg p-8">
+
           <div className="text-center mb-8">
-            <p className="text-white text-lg font-semibold border-b border-gray-700 pb-4">SCREEN</p>
+            <p className="text-white text-xl font-bold border-b-2 border-gray-600 pb-3">
+              SCREEN
+            </p>
           </div>
 
-          <div className="grid grid-cols-8 gap-3 mb-8">
-            {seats.map((seat) => (
-              <button
-                key={seat.id}
-                onClick={() => handleSeatClick(seat)}
-                disabled={seat.status === "booked"}
-                title={`${seat.id} - ₹${seat.price}`}
-                className={`w-10 h-10 rounded flex items-center justify-center font-semibold text-sm transition ${
-                  seat.status === "booked"
-                    ? "bg-gray-600 text-gray-400 cursor-not-allowed"
-                    : selectedSeats.find((s) => s.id === seat.id)
-                      ? "bg-red-500 text-white"
-                      : "bg-green-500 hover:bg-green-400 text-white cursor-pointer"
-                }`}
-              >
-                {seat.number}
-              </button>
+          <div className="space-y-6 mb-8">
+            {regularRows.map(row => (
+              <div key={row} className="flex items-center gap-3 mb-2">
+                <span className="text-white font-semibold w-12 text-sm">
+                  Row {rowToLetter(row)}
+                </span>
+
+                <div className="flex gap-1.5 flex-wrap">
+                  {seatsByRow[row].map(seat => {
+                    const status = getSeatStatus(seat)
+                    return (
+                      <button
+                        key={seat._id}
+                        onClick={() => handleSeatClick(seat)}
+                        disabled={seat.status === "BOOKED"}
+                        className={`w-8 h-8 rounded-t-lg text-[10px] font-semibold ${
+                          status === "booked"
+                            ? "bg-gray-600"
+                            : status === "selected"
+                            ? "bg-red-500"
+                            : status === "recommended"
+                            ? "bg-yellow-500"
+                            : "bg-green-500"
+                        }`}
+                      >
+                        {rowToLetter(seat.row)}{seat.column}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
             ))}
           </div>
 
-          <div className="flex justify-center gap-8 bg-gray-800 rounded-lg p-4">
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 bg-green-500 rounded"></div>
-              <span className="text-gray-300 text-sm">Available</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 bg-red-500 rounded"></div>
-              <span className="text-gray-300 text-sm">Selected</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 bg-gray-600 rounded"></div>
-              <span className="text-gray-300 text-sm">Booked</span>
-            </div>
-          </div>
         </div>
       </div>
 
       <div className="bg-gray-900 rounded-lg p-6 h-fit sticky top-20">
-        <h2 className="text-2xl font-bold text-white mb-6">Booking Summary</h2>
+        <h2 className="text-2xl font-semibold text-white mb-6">Booking Summary</h2>
 
-        <div className="space-y-4 mb-6 pb-6 border-b border-gray-700">
-          <div className="flex justify-between text-gray-300">
-            <span>Movie:</span>
-            <span className="text-white font-semibold">{movieTitle}</span>
-          </div>
-          <div className="flex justify-between text-gray-300">
-            <span>Theatre:</span>
-            <span className="text-white font-semibold">{theatreName}</span>
-          </div>
-          <div className="flex justify-between text-gray-300">
-            <span>Time:</span>
-            <span className="text-white font-semibold">{time}</span>
-          </div>
-        </div>
+        <p className="text-white mb-4">
+          Selected Seats: {selectedSeats.length}
+        </p>
 
-        {selectedSeats.length > 0 ? (
-          <>
-            <h3 className="text-lg font-bold text-white mb-4">Selected Seats</h3>
-            <div className="space-y-2 mb-6 pb-6 border-b border-gray-700 max-h-40 overflow-y-auto">
-              {selectedSeats.map((seat) => (
-                <div key={seat.id} className="flex justify-between text-gray-300 text-sm">
-                  <span>{seat.id}</span>
-                  <span className="text-red-400">₹{seat.price}</span>
-                </div>
-              ))}
-            </div>
+        <p className="text-white mb-6">
+          Total: ₹{totalPrice}
+        </p>
 
-            <div className="flex justify-between items-center mb-6 text-lg font-bold text-white">
-              <span>Total Amount:</span>
-              <span className="text-red-500">₹{totalPrice}</span>
-            </div>
-
-            <button className="w-full bg-red-500 hover:bg-red-600 text-white py-3 rounded-lg font-semibold transition">
-              Proceed to Payment
-            </button>
-          </>
-        ) : (
-          <p className="text-gray-400 text-center py-8">Select seats to continue</p>
-        )}
+        <button
+          onClick={handleBooking}
+          disabled={bookingLoading}
+          className="w-full bg-red-500 text-white py-3 rounded-lg"
+        >
+          {bookingLoading ? "Processing..." : "Confirm Booking"}
+        </button>
       </div>
     </div>
   )

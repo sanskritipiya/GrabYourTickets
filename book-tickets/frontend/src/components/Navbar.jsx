@@ -3,17 +3,30 @@ import { useState, useEffect } from "react"
 
 export default function Navbar() {
   const location = useLocation()
+
   const [user, setUser] = useState(null)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [userRole, setUserRole] = useState(null)
 
   const isActive = (path) => location.pathname === path
 
   const loadSession = () => {
-    const token = localStorage.getItem("authToken") || localStorage.getItem("token")
+    const token =
+      localStorage.getItem("authToken") || localStorage.getItem("token")
     const storedUser = localStorage.getItem("user")
+    const role = localStorage.getItem("userRole")
 
-    setIsLoggedIn(!!token)
+    setUserRole(role)
+
+    // ❌ Admin should NOT be treated as a logged-in user here
+    if (!token || role === "admin") {
+      setIsLoggedIn(false)
+      setUser(null)
+      return
+    }
+
+    setIsLoggedIn(true)
 
     if (!storedUser) {
       setUser(null)
@@ -28,16 +41,17 @@ export default function Navbar() {
     }
   }
 
-  // Load user from localStorage on mount and when location changes
+  // Load session on route change
   useEffect(() => {
     loadSession()
   }, [location.pathname])
 
   const handleLogout = () => {
     localStorage.removeItem("authToken")
-    localStorage.removeItem("user")
     localStorage.removeItem("token")
+    localStorage.removeItem("user")
     localStorage.removeItem("userRole")
+
     setUser(null)
     setIsLoggedIn(false)
     setDropdownOpen(false)
@@ -49,8 +63,12 @@ export default function Navbar() {
 
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2">
-          <img src="logo.png" alt="GrabYourTickets Logo" className="w-10 h-10 object-contain" />
-          <span className="text-xl md:text-2xl font-bold text-white hover:text-red-500 transition">
+          <img
+            src="/logo.png"
+            alt="GrabYourTickets Logo"
+            className="w-10 h-10 object-contain"
+          />
+          <span className="text-xl md:text-2xl font-semibold text-white hover:text-red-500 transition">
             GrabYourTickets
           </span>
         </Link>
@@ -72,7 +90,9 @@ export default function Navbar() {
             <Link
               to="/movies"
               className={`transition font-medium ${
-                isActive("/movies") ? "text-red-500" : "text-gray-300 hover:text-white"
+                isActive("/movies")
+                  ? "text-red-500"
+                  : "text-gray-300 hover:text-white"
               }`}
             >
               Movies
@@ -83,7 +103,9 @@ export default function Navbar() {
             <Link
               to="/theatres"
               className={`transition font-medium ${
-                isActive("/theatres") ? "text-red-500" : "text-gray-300 hover:text-white"
+                isActive("/theatres")
+                  ? "text-red-500"
+                  : "text-gray-300 hover:text-white"
               }`}
             >
               Theatres
@@ -94,7 +116,9 @@ export default function Navbar() {
             <Link
               to="/new-releases"
               className={`transition font-medium ${
-                isActive("/new-releases") ? "text-red-500" : "text-gray-300 hover:text-white"
+                isActive("/new-releases")
+                  ? "text-red-500"
+                  : "text-gray-300 hover:text-white"
               }`}
             >
               New Releases
@@ -107,7 +131,7 @@ export default function Navbar() {
           <div className="relative">
             <button
               onClick={() => setDropdownOpen(!dropdownOpen)}
-              className="bg-gray-800 px-3 py-2 rounded-full flex items-center gap-2 hover:bg-gray-700 transition"
+              className="bg-white px-3 py-2 rounded-full flex items-center gap-2 hover:bg-gray-200 transition"
               aria-expanded={dropdownOpen}
             >
               <img
@@ -118,10 +142,10 @@ export default function Navbar() {
             </button>
 
             {dropdownOpen && (
-              <div className="absolute right-0 mt-2 w-48 bg-gray-800 border border-gray-700 rounded shadow-lg z-50">
+              <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50 overflow-hidden">
                 <Link
                   to="/my-tickets"
-                  className="block px-4 py-2 hover:bg-gray-700"
+                  className="block px-4 py-2 text-gray-800 hover:bg-gray-100 transition"
                   onClick={() => setDropdownOpen(false)}
                 >
                   View Bookings
@@ -129,7 +153,7 @@ export default function Navbar() {
 
                 <button
                   onClick={handleLogout}
-                  className="block w-full text-left px-4 py-2 hover:bg-gray-700 text-red-400"
+                  className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-100 transition"
                 >
                   Logout
                 </button>
@@ -141,11 +165,14 @@ export default function Navbar() {
             <Link
               to="/login"
               className={`transition font-medium ${
-                isActive("/login") ? "text-red-500" : "text-gray-300 hover:text-white"
+                isActive("/login")
+                  ? "text-red-500"
+                  : "text-gray-300 hover:text-white"
               }`}
             >
               Login
             </Link>
+
             <Link
               to="/signup"
               className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-full font-medium transition"

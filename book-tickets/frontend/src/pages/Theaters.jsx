@@ -1,7 +1,23 @@
+import { useEffect, useState } from "react";
 import Footer from "../components/Footer";
-import { theatres } from "../assets/assets";
 
 const Theatres = () => {
+  const [theatres, setTheatres] = useState([]);
+
+  useEffect(() => {
+    const fetchCinemas = async () => {
+      try {
+        const res = await fetch("/api/cinemas"); // router.get("/", getAllCinemas)
+        const data = await res.json();
+        setTheatres(data);
+      } catch (error) {
+        console.error("Failed to fetch cinemas:", error);
+      }
+    };
+
+    fetchCinemas();
+  }, []);
+
   return (
     <div className="bg-gray-950 min-h-screen">
       <div className="max-w-7xl mx-auto px-4 pt-12 pb-8">

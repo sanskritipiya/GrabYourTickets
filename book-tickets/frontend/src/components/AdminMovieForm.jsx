@@ -6,7 +6,6 @@ export default function MovieForm({ movie, onSubmit, onCancel }) {
     title: movie?.title || "",
     genre: movie?.genre || "",
     duration: movie?.duration || "",
-    rating: movie?.rating || "",
     language: movie?.language || "",
     description: movie?.description || "",
     releaseDate: movie?.releaseDate || "",
@@ -40,12 +39,11 @@ export default function MovieForm({ movie, onSubmit, onCancel }) {
       title: formData.title,
       genre: formData.genre,
       language: formData.language,
-      duration: Number(formData.duration), // convert string to number
-      rating: Number(formData.rating),     // convert string to number
+      duration: Number(formData.duration),
       releaseDate: formData.releaseDate,
       description: formData.description,
-      trailer: formData.trailer,           // backend maps trailer -> trailerUrl
-      image: formData.image                // base64 or URL
+      trailer: formData.trailer, // backend maps trailer -> trailerUrl
+      image: formData.image
     };
 
     onSubmit(submitData);
@@ -54,8 +52,13 @@ export default function MovieForm({ movie, onSubmit, onCancel }) {
   return (
     <div className="bg-white rounded-lg border-2 border-red-600 shadow-sm">
       <div className="p-6 border-b border-gray-200 flex items-center justify-between">
-        <h3 className="text-lg font-semibold">{movie ? "Edit Movie" : "Add New Movie"}</h3>
-        <button onClick={onCancel} className="p-1 hover:bg-gray-100 rounded transition-colors">
+        <h3 className="text-lg font-semibold">
+          {movie ? "Edit Movie" : "Add New Movie"}
+        </h3>
+        <button
+          onClick={onCancel}
+          className="p-1 hover:bg-gray-100 rounded transition-colors"
+        >
           <X className="w-4 h-4" />
         </button>
       </div>
@@ -64,65 +67,77 @@ export default function MovieForm({ movie, onSubmit, onCancel }) {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-2 text-gray-700">Title *</label>
+              <label className="block text-sm font-medium mb-2 text-gray-700">
+                Title *
+              </label>
               <input
                 type="text"
                 value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, title: e.target.value })
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
                 required
               />
             </div>
+
             <div>
-              <label className="block text-sm font-medium mb-2 text-gray-700">Genre *</label>
+              <label className="block text-sm font-medium mb-2 text-gray-700">
+                Genre *
+              </label>
               <input
                 type="text"
                 value={formData.genre}
-                onChange={(e) => setFormData({ ...formData, genre: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, genre: e.target.value })
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
                 required
               />
             </div>
+
             <div>
-              <label className="block text-sm font-medium mb-2 text-gray-700">Language *</label>
+              <label className="block text-sm font-medium mb-2 text-gray-700">
+                Language *
+              </label>
               <input
                 type="text"
                 value={formData.language}
-                onChange={(e) => setFormData({ ...formData, language: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, language: e.target.value })
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
                 placeholder="English"
                 required
               />
             </div>
+
             <div>
-              <label className="block text-sm font-medium mb-2 text-gray-700">Duration *</label>
+              <label className="block text-sm font-medium mb-2 text-gray-700">
+                Duration (minutes) *
+              </label>
               <input
                 type="number"
                 value={formData.duration}
-                onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, duration: e.target.value })
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
                 placeholder="148"
                 required
               />
             </div>
+
             <div>
-              <label className="block text-sm font-medium mb-2 text-gray-700">Rating *</label>
-              <input
-                type="number"
-                step="0.1"
-                value={formData.rating}
-                onChange={(e) => setFormData({ ...formData, rating: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                placeholder="8.8"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-2 text-gray-700">Release Date *</label>
+              <label className="block text-sm font-medium mb-2 text-gray-700">
+                Release Date *
+              </label>
               <input
                 type="date"
                 value={formData.releaseDate}
-                onChange={(e) => setFormData({ ...formData, releaseDate: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, releaseDate: e.target.value })
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
                 required
               />
@@ -130,10 +145,14 @@ export default function MovieForm({ movie, onSubmit, onCancel }) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2 text-gray-700">Description *</label>
+            <label className="block text-sm font-medium mb-2 text-gray-700">
+              Description *
+            </label>
             <textarea
               value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, description: e.target.value })
+              }
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
               rows="3"
               placeholder="Enter movie description..."
@@ -142,34 +161,53 @@ export default function MovieForm({ movie, onSubmit, onCancel }) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2 text-gray-700">Trailer URL</label>
+            <label className="block text-sm font-medium mb-2 text-gray-700">
+              Trailer URL
+            </label>
             <input
               type="url"
               value={formData.trailer}
-              onChange={(e) => setFormData({ ...formData, trailer: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, trailer: e.target.value })
+              }
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
               placeholder="https://youtube.com/..."
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2 text-gray-700">Movie Poster *</label>
+            <label className="block text-sm font-medium mb-2 text-gray-700">
+              Movie Poster *
+            </label>
             <div className="flex items-start gap-4">
               <div className="flex-1">
                 <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
                   <div className="flex flex-col items-center justify-center pt-5 pb-6">
                     <Upload className="w-8 h-8 mb-2 text-gray-500" />
                     <p className="text-sm text-gray-500">
-                      <span className="font-semibold">Click to upload</span> or drag and drop
+                      <span className="font-semibold">Click to upload</span> or
+                      drag and drop
                     </p>
-                    <p className="text-xs text-gray-500">PNG, JPG or WEBP (MAX. 5MB)</p>
+                    <p className="text-xs text-gray-500">
+                      PNG, JPG or WEBP (MAX. 5MB)
+                    </p>
                   </div>
-                  <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} />
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                  />
                 </label>
               </div>
+
               {imagePreview && (
                 <div className="w-32 h-32 border border-gray-300 rounded-lg overflow-hidden">
-                  <img src={imagePreview || "/placeholder.svg"} alt="Preview" className="w-full h-full object-cover" />
+                  <img
+                    src={imagePreview}
+                    alt="Preview"
+                    className="w-full h-full object-cover"
+                  />
                 </div>
               )}
             </div>
@@ -182,6 +220,7 @@ export default function MovieForm({ movie, onSubmit, onCancel }) {
             >
               {movie ? "Update Movie" : "Add Movie"}
             </button>
+
             <button
               type="button"
               onClick={onCancel}

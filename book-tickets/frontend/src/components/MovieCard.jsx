@@ -6,7 +6,10 @@ const MovieCard = ({ movie, upcoming = false }) => {
     e.target.src = "/images/popcorn.png"
   }
 
-  const toHref = upcoming ? `/movie/${movie.id}?upcoming=1` : `/movie/${movie.id}`
+  // ✅ Use MongoDB _id instead of id
+  const movieId = movie._id || movie.id
+  const toHref = upcoming ? `/movie/${movieId}?upcoming=1` : `/movie/${movieId}`
+
   return (
     <Link to={toHref} className="group cursor-pointer block">
       <div className="rounded-xl overflow-hidden border border-gray-800 bg-gray-900 shadow-lg shadow-black/30 mb-3">
@@ -14,7 +17,7 @@ const MovieCard = ({ movie, upcoming = false }) => {
           <img
             src={movie.image || "/images/popcorn.png"}
             onError={handleImgError}
-            alt={movie.title}
+            alt={movie.title || "Movie poster"}
             loading="lazy"
             className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
           />
@@ -29,7 +32,6 @@ const MovieCard = ({ movie, upcoming = false }) => {
           <p className="text-gray-400 text-sm">{upcoming ? "Coming Soon" : movie.genre}</p>
           <div className="flex justify-between text-xs mt-2">
             {!upcoming && <span className="text-gray-400">{movie.year}</span>}
-            {!upcoming && <span className="text-yellow-400">⭐ {movie.rating}</span>}
           </div>
         </div>
       </div>

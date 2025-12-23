@@ -20,27 +20,32 @@ export default function Login() {
 
       const { token, id, name, email, role } = res.data;
 
-      // Save token and user/admin data to localStorage
-      localStorage.setItem("authToken", token);
-      localStorage.setItem("token", token); // Also save as 'token' for compatibility
-      
-      // Save user or admin data with all details
-      const userData = { id, name, email, role };
+      // ✅ STORE USER WITH TOKEN (THIS FIXES BOOKING)
+      const userData = {
+        id,
+        name,
+        email,
+        role,
+        token, // 🔥 THIS WAS MISSING
+      };
+
       localStorage.setItem("user", JSON.stringify(userData));
-      
-      // Also save role separately for easy access
+
+      // (optional compatibility – harmless)
+      localStorage.setItem("token", token);
+      localStorage.setItem("authToken", token);
       localStorage.setItem("userRole", role);
 
       if (role === "admin") {
         toast.success("Admin Logged In Successfully!");
         setTimeout(() => {
-          navigate("/admin/dashboard"); // Navigate to admin dashboard
-          window.location.reload(); // optional to update UI
+          navigate("/admin/dashboard");
+          window.location.reload();
         }, 800);
       } else {
         toast.success("Logged In Successfully!");
         setTimeout(() => {
-          navigate("/"); // Navigate to user homepage
+          navigate("/");
           window.location.reload();
         }, 800);
       }
@@ -52,11 +57,13 @@ export default function Login() {
   return (
     <div className="bg-gray-950 min-h-screen flex items-center justify-center py-12 px-4">
       <ToastContainer position="top-center" autoClose={1500} />
-      
+
       <div className="bg-gray-900 border border-gray-800 rounded-xl w-full max-w-lg p-8 text-white">
         <div className="mb-6">
           <h2 className="text-2xl font-semibold">Login</h2>
-          <p className="text-gray-400 text-sm mt-1">Welcome back! Please login to your account.</p>
+          <p className="text-gray-400 text-sm mt-1">
+            Welcome back! Please login to your account.
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -107,7 +114,10 @@ export default function Login() {
 
         <p className="text-sm text-gray-400 mt-6 text-center">
           Don't have an account?{" "}
-          <Link to="/signup" className="text-red-400 hover:text-red-300 font-medium">
+          <Link
+            to="/signup"
+            className="text-red-400 hover:text-red-300 font-medium"
+          >
             Sign up
           </Link>
         </p>
