@@ -38,7 +38,7 @@ exports.protect = async (req, res, next) => {
       return res.status(401).json({ message: "User not found" });
     }
 
-    // ✅ CONSISTENT SHAPE (THIS FIXES BOOKING)
+
     req.user = {
       id: user._id.toString(),
       role: user.role,

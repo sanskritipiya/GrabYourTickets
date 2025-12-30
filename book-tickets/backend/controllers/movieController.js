@@ -1,6 +1,5 @@
 const Movie = require("../models/Movie");
 
-
 exports.addMovie = async (req, res) => {
   try {
     const movieData = {
@@ -11,10 +10,14 @@ exports.addMovie = async (req, res) => {
       releaseDate: req.body.releaseDate,
       description: req.body.description,
       trailerUrl: req.body.trailer || req.body.trailerUrl || "",
-      image: req.body.image
+      image: req.body.image,
+
+      // ✅ ADDED
+      isNewRelease: req.body.isNewRelease || false
     };
 
     const movie = await Movie.create(movieData);
+
     res.status(201).json({
       success: true,
       data: movie
@@ -31,6 +34,23 @@ exports.addMovie = async (req, res) => {
 exports.getMovies = async (req, res) => {
   try {
     const movies = await Movie.find();
+    res.status(200).json({
+      success: true,
+      data: movies
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+exports.getNewReleases = async (req, res) => {
+  try {
+    const movies = await Movie.find({ isNewRelease: true })
+      .sort({ createdAt: -1 });
+
     res.status(200).json({
       success: true,
       data: movies

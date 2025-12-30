@@ -2,6 +2,13 @@ import React from "react"
 import { Edit, Trash2 } from "lucide-react"
 
 export default function HeroSlideCard({ slide, onEdit, onDelete, onToggleActive }) {
+
+  // ✅ New Release Logic (last 30 days)
+  const isNewRelease = slide.releaseDate
+    ? (Date.now() - new Date(slide.releaseDate).getTime()) /
+        (1000 * 60 * 60 * 24) <= 30
+    : false
+
   return (
     <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden hover:shadow-lg transition-shadow">
       <div className="flex flex-col md:flex-row">
@@ -11,6 +18,15 @@ export default function HeroSlideCard({ slide, onEdit, onDelete, onToggleActive 
             alt={slide.title}
             className="w-full h-48 object-cover"
           />
+
+          {/* 🆕 New Release Badge */}
+          {isNewRelease && (
+            <span className="absolute top-2 left-2 bg-green-600 text-white text-xs font-bold px-2 py-1 rounded">
+              NEW RELEASE
+            </span>
+          )}
+
+          {/* Active / Inactive Toggle */}
           <div className="absolute top-2 right-2">
             <button
               onClick={() => onToggleActive(slide)}
@@ -24,18 +40,26 @@ export default function HeroSlideCard({ slide, onEdit, onDelete, onToggleActive 
             </button>
           </div>
         </div>
+
         <div className="flex-1 p-6">
           <div className="flex justify-between items-start">
             <div className="flex-1">
-              <h3 className="text-2xl font-bold mb-2 text-gray-900">{slide.title}</h3>
+              <h3 className="text-2xl font-bold mb-2 text-gray-900">
+                {slide.title}
+              </h3>
               <p className="text-gray-600 mb-4">{slide.subtitle}</p>
+
               {slide.description && (
-                <p className="text-sm text-gray-500 mb-4">{slide.description}</p>
+                <p className="text-sm text-gray-500 mb-4">
+                  {slide.description}
+                </p>
               )}
+
               <button className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm">
                 {slide.ctaText || slide.cta || "Learn More"}
               </button>
             </div>
+
             <div className="flex gap-2 ml-4">
               <button
                 onClick={() => onEdit(slide)}

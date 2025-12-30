@@ -6,11 +6,13 @@ const {
   getMovieById,
   updateMovie,
   deleteMovie,
+  getNewReleases,
 } = require("../controllers/movieController");
 const { protect, admin } = require("../middleware/authMiddleware");
 
 
 router.get("/", getMovies);        // GET all movies
+router.get("/new-releases", getNewReleases);  // GET new releases
 router.get("/:id", getMovieById);  // GET movie by ID
 
 

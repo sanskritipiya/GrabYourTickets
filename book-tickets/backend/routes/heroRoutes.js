@@ -1,21 +1,46 @@
 const express = require("express");
 const router = express.Router();
+
 const {
   addHero,
   getAllHeroes,
   getHeroById,
   updateHero,
-  deleteHero
+  deleteHero,
 } = require("../controllers/heroController");
+
 const { protect, admin } = require("../middleware/authMiddleware");
+const upload = require("../middleware/upload"); // multer
 
-// Public routes
-router.get("/", getAllHeroes);      // GET /api/heroes
-router.get("/:id", getHeroById);   // GET /api/heroes/:id
 
-// Admin-only routes
-router.post("/", protect, admin, addHero);          // POST /api/heroes
-router.put("/:id", protect, admin, updateHero);     // PUT /api/heroes/:id
-router.delete("/:id", protect, admin, deleteHero);  // DELETE /api/heroes/:id
+router.get("/", getAllHeroes);
+router.get("/:id", getHeroById);
+
+
+// ADD HERO (IMAGE REQUIRED)
+router.post(
+  "/",
+  protect,
+  admin,
+  upload.single("backgroundImage"), 
+  addHero
+);
+
+// UPDATE HERO (IMAGE OPTIONAL)
+router.put(
+  "/:id",
+  protect,
+  admin,
+  upload.single("backgroundImage"), 
+  updateHero
+);
+
+// DELETE HERO
+router.delete(
+  "/:id",
+  protect,
+  admin,
+  deleteHero
+);
 
 module.exports = router;

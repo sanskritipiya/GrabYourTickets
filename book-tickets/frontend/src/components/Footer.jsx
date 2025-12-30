@@ -8,7 +8,7 @@ const Footer = () => (
       <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
         {/* Brand */}
         <div>
-          <h3 className="text-2xl font-bold text-white mb-4">🎬 QuickShow</h3>
+          <h3 className="text-2xl font-bold text-white mb-4">GrabYourTicekts</h3>
           <p className="text-gray-400 text-sm">
             Your ultimate destination for movie tickets and cinema experience.
           </p>
@@ -23,9 +23,6 @@ const Footer = () => (
             </li>
             <li>
               <Link to="/movies" className="text-gray-400 hover:text-red-500 transition">All Movies</Link>
-            </li>
-            <li>
-              <Link to="/theatres" className="text-gray-400 hover:text-red-500 transition">Theatres</Link>
             </li>
             <li>
               <Link to="/new-releases" className="text-gray-400 hover:text-red-500 transition">New Releases</Link>
@@ -75,7 +72,7 @@ const Footer = () => (
       {/* Bottom */}
       <div className="border-t border-gray-800 pt-8">
         <p className="text-gray-400 text-center text-sm">
-          © 2025 QuickShow. All rights reserved. | Premium Movie Booking Experience
+          © 2025 GrabYourTicktes. All rights reserved. | Premium Movie Booking Experience
         </p>
       </div>
     </div>

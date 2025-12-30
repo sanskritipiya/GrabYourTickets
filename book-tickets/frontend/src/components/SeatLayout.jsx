@@ -1,184 +1,271 @@
-import { useState, useEffect } from "react"
-import axios from "axios"
-import { useNavigate } from "react-router-dom"
+import { useState, useEffect, useMemo } from "react"
 
-const SeatLayout = ({
-  showId,
+const SEAT_PRICE = 800 // ₹
+
+export default function SeatLayout({
+  seats = [],
   cinemaId,
+  showId,
   hallName,
-  movieTitle,
-  cinemaName,
-  time,
-  showDate,
-  seats: initialSeats = [],
-  onSeatSelect
-}) => {
-  const navigate = useNavigate()
-
-  const [seats, setSeats] = useState(initialSeats)
+  onSeatSelect,
+  onConfirm,
+}) {
   const [selectedSeats, setSelectedSeats] = useState([])
-  const [recommendedSeats, setRecommendedSeats] = useState([])
-  const [showRecommendation, setShowRecommendation] = useState(false)
-  const [seatCount, setSeatCount] = useState(2)
-  const [bookingLoading, setBookingLoading] = useState(false)
+  const [recommendMode, setRecommendMode] = useState(null)
+  const [loadingReco, setLoadingReco] = useState(false)
+  const [recommendedSeatsList, setRecommendedSeatsList] = useState([])
 
-  useEffect(() => {
-    setSeats(initialSeats)
-  }, [initialSeats])
+  /* ================= ROWS ================= */
+  const rows = useMemo(() => {
+    const uniqueRows = [...new Set(seats.map(s => s.row))]
+    return uniqueRows.sort()
+  }, [seats])
 
-  // -------------------------------
-  // ROW NUMBER → LETTER (1=A, 2=B...)
-  // -------------------------------
-  const rowToLetter = (row) =>
-    String.fromCharCode(64 + Number(row))
+  /* ================= SEATS BY ROW ================= */
+  const seatsByRow = useMemo(() => {
+    const map = {}
+    rows.forEach(row => {
+      map[row] = seats
+        .filter(s => s.row === row)
+        .sort((a, b) => a.column - b.column)
+    })
+    return map
+  }, [rows, seats])
 
-  // -------------------------------
-  // ORGANIZE SEATS
-  // -------------------------------
-  const seatsByRow = {}
-
-  seats.forEach(seat => {
-    if (!seat || seat.row == null || seat.column == null) return
-
-    seat.type = seat.type || "REGULAR"
-
-    if (!seatsByRow[seat.row]) {
-      seatsByRow[seat.row] = []
-    }
-    seatsByRow[seat.row].push(seat)
-  })
-
-  Object.keys(seatsByRow).forEach(row => {
-    seatsByRow[row].sort((a, b) => a.column - b.column)
-  })
-
-  const regularRows = Object.keys(seatsByRow).sort((a, b) => a - b)
-
-  // -------------------------------
-  // SEAT INTERACTION
-  // -------------------------------
-  const handleSeatClick = (seat) => {
-    if (seat.status === "BOOKED") return
-
-    const exists = selectedSeats.find(s => s._id === seat._id)
-    const updated = exists
-      ? selectedSeats.filter(s => s._id !== seat._id)
-      : [...selectedSeats, seat]
-
-    setSelectedSeats(updated)
-    onSeatSelect(updated)
-  }
-
-  const totalPrice = selectedSeats.length * 200
-
-  const getSeatStatus = (seat) => {
-    if (seat.status === "BOOKED") return "booked"
+  /* ================= SEAT STATUS ================= */
+  const getSeatStatus = seat => {
+    if (seat.status !== "AVAILABLE") return "unavailable"
     if (selectedSeats.find(s => s._id === seat._id)) return "selected"
-    if (recommendedSeats.find(s => s._id === seat._id) && showRecommendation) return "recommended"
     return "available"
   }
 
-  // -------------------------------
-  // BOOKING
-  // -------------------------------
-  const handleBooking = async () => {
-    if (!selectedSeats.length) {
-      alert("Please select at least one seat")
-      return
-    }
+  /* ================= TOGGLE SEAT ================= */
+  const handleSeatToggle = seat => {
+    setSelectedSeats(prev =>
+      prev.find(s => s._id === seat._id)
+        ? prev.filter(s => s._id !== seat._id)
+        : [...prev, seat]
+    )
+  }
 
-    setBookingLoading(true)
+  /* ================= EMIT SELECTED ================= */
+  useEffect(() => {
+    onSeatSelect(selectedSeats)
+  }, [selectedSeats, onSeatSelect])
+
+  /* ================= FETCH RECOMMENDATION ================= */
+  const fetchRecommendedSeats = async (mode, count = 2) => {
     try {
-      const token = localStorage.getItem("token")
-      const seatIds = selectedSeats.map(s => s._id)
+      setLoadingReco(true)
 
-      await axios.post(
-        "http://localhost:3000/api/bookings",
-        { showId, seatIds },
-        { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+      const res = await fetch(
+        `http://localhost:3000/api/seats/recommend?cinemaId=${cinemaId}&showId=${showId}&hallName=${hallName}&count=${count}&mode=${mode}`
       )
 
-      alert("Booking confirmed!")
-      navigate("/")
-    } catch {
-      alert("Booking failed.")
+      const data = await res.json()
+
+      if (data.success && data.recommendedSeats) {
+        // Store the list of recommended seats for display
+        setRecommendedSeatsList(data.recommendedSeats)
+        
+        // Auto-select the first recommendation (optional - you can remove this if you want users to click)
+        // For "best" mode, don't auto-select, let users choose
+        if (mode === "row" || mode === "ROW") {
+          const recommended = seats.filter(seat =>
+            data.recommendedSeats.some(r => r.seatId === seat._id)
+          )
+          setSelectedSeats(recommended)
+        }
+      }
+    } catch (err) {
+      console.error("Recommendation failed", err)
     } finally {
-      setBookingLoading(false)
+      setLoadingReco(false)
     }
   }
 
-  // -------------------------------
-  // UI (UNCHANGED)
-  // -------------------------------
+  /* ================= HANDLE RECOMMENDATION CLICK ================= */
+  const handleRecommendationClick = (recommendedSeat) => {
+    const seat = seats.find(s => s._id === recommendedSeat.seatId)
+    if (seat && seat.status === "AVAILABLE") {
+      handleSeatToggle(seat)
+    }
+  }
+
+  const totalPrice = selectedSeats.length * SEAT_PRICE
+
+  /* ================= UI ================= */
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-      <div className="lg:col-span-2">
-        <div className="bg-gray-900 rounded-lg p-8">
+    <div className="flex flex-row gap-8 p-6 md:p-12 max-w-7xl mx-auto">
+      {/* ================= LEFT ================= */}
+      <div className="flex-1 space-y-8">
+        <div>
+          <h1 className="text-4xl font-light mb-2">Select Your Seat</h1>
+          <p className="text-muted-foreground">
+            Choose your perfect spot for an unforgettable experience
+          </p>
+        </div>
 
-          <div className="text-center mb-8">
-            <p className="text-white text-xl font-bold border-b-2 border-gray-600 pb-3">
-              SCREEN
-            </p>
+        {/* SCREEN */}
+        <div className="space-y-8">
+          <div className="flex justify-center">
+            <div className="w-3/4 h-2 bg-gradient-to-b from-muted/60 to-muted/30 rounded-full blur-sm" />
           </div>
+          <p className="text-center text-sm uppercase tracking-widest text-muted-foreground">
+            Screen
+          </p>
 
-          <div className="space-y-6 mb-8">
-            {regularRows.map(row => (
-              <div key={row} className="flex items-center gap-3 mb-2">
-                <span className="text-white font-semibold w-12 text-sm">
-                  Row {rowToLetter(row)}
-                </span>
+          {/* SEATS */}
+          <div className="flex gap-8 justify-center">
+            {/* ROW LABELS */}
+            <div className="flex flex-col pt-1">
+              {rows.map(row => (
+                <div
+                  key={row}
+                  className="h-12 w-6 flex items-center justify-center text-sm text-muted-foreground"
+                >
+                  {row}
+                </div>
+              ))}
+            </div>
 
-                <div className="flex gap-1.5 flex-wrap">
+            {/* GRID */}
+            <div className="space-y-1">
+              {rows.map(row => (
+                <div key={row} className="flex gap-1">
                   {seatsByRow[row].map(seat => {
                     const status = getSeatStatus(seat)
+
                     return (
                       <button
                         key={seat._id}
-                        onClick={() => handleSeatClick(seat)}
-                        disabled={seat.status === "BOOKED"}
-                        className={`w-8 h-8 rounded-t-lg text-[10px] font-semibold ${
-                          status === "booked"
-                            ? "bg-gray-600"
-                            : status === "selected"
-                            ? "bg-red-500"
-                            : status === "recommended"
-                            ? "bg-yellow-500"
-                            : "bg-green-500"
-                        }`}
+                        disabled={status === "unavailable"}
+                        onClick={() => handleSeatToggle(seat)}
+                        className={`
+                          w-12 h-12 rounded-md text-xs transition-all
+                          ${seat.isBestRow ? "ring-2 ring-yellow-400" : ""}
+                          ${
+                            status === "available"
+                              ? "bg-muted hover:bg-primary/20 border"
+                              : status === "selected"
+                              ? "bg-primary text-white scale-105"
+                              : "bg-muted/50 opacity-50 cursor-not-allowed"
+                          }
+                        `}
                       >
-                        {rowToLetter(seat.row)}{seat.column}
+                        {status === "selected" ? "✓" : seat.seatNumber}
                       </button>
                     )
                   })}
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-
         </div>
       </div>
 
-      <div className="bg-gray-900 rounded-lg p-6 h-fit sticky top-20">
-        <h2 className="text-2xl font-semibold text-white mb-6">Booking Summary</h2>
+      {/* ================= RIGHT PANEL ================= */}
+      <div className="w-80">
+        <div className="bg-card border rounded-lg p-6 space-y-6 sticky top-6">
+          <h2 className="text-lg font-semibold uppercase">Recommendations</h2>
 
-        <p className="text-white mb-4">
-          Selected Seats: {selectedSeats.length}
-        </p>
+          <div className="space-y-2">
+            <button
+              disabled={loadingReco}
+              onClick={() => {
+                setRecommendMode("BEST")
+                fetchRecommendedSeats("best", 2)
+              }}
+              className={`w-full py-2 rounded font-medium ${
+                recommendMode === "BEST"
+                  ? "bg-primary text-white"
+                  : "bg-muted"
+              }`}
+            >
+              Best Seats
+            </button>
 
-        <p className="text-white mb-6">
-          Total: ₹{totalPrice}
-        </p>
+            <button
+              disabled={loadingReco}
+              onClick={() => {
+                setRecommendMode("ROW")
+                fetchRecommendedSeats("row", selectedSeats.length || 2)
+              }}
+              className={`w-full py-2 rounded font-medium ${
+                recommendMode === "ROW"
+                  ? "bg-primary text-white"
+                  : "bg-muted"
+              }`}
+            >
+              Same Row
+            </button>
+          </div>
 
-        <button
-          onClick={handleBooking}
-          disabled={bookingLoading}
-          className="w-full bg-red-500 text-white py-3 rounded-lg"
-        >
-          {bookingLoading ? "Processing..." : "Confirm Booking"}
-        </button>
+          {/* RECOMMENDED SEATS LIST */}
+          {recommendedSeatsList.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-2">
+                {recommendedSeatsList.map((recSeat) => {
+                  const seat = seats.find(s => s._id === recSeat.seatId)
+                  const isSelected = selectedSeats.some(s => s._id === recSeat.seatId)
+                  const isAvailable = seat && seat.status === "AVAILABLE"
+                  
+                  return (
+                    <button
+                      key={recSeat.seatId}
+                      disabled={!isAvailable}
+                      onClick={() => handleRecommendationClick(recSeat)}
+                      className={`
+                        px-3 py-1.5 rounded-md text-xs font-medium transition-all
+                        ${
+                          isSelected
+                            ? "bg-primary text-white"
+                            : isAvailable
+                            ? "bg-muted hover:bg-primary/20 border cursor-pointer"
+                            : "bg-muted/50 opacity-50 cursor-not-allowed"
+                        }
+                      `}
+                    >
+                      {recSeat.label || `${recSeat.row}${recSeat.column}`}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {loadingReco && (
+            <div className="text-sm text-muted-foreground">Loading recommendations...</div>
+          )}
+
+          {/* ORDER SUMMARY */}
+          <div className="border-t pt-4 space-y-4">
+            <h2 className="text-lg font-semibold">Order Summary</h2>
+            {selectedSeats.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No seats selected</p>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Seats ({selectedSeats.length})</span>
+                  <span>₹{totalPrice}</span>
+                </div>
+              </div>
+            )}
+
+            <button
+              disabled={selectedSeats.length === 0}
+              onClick={onConfirm}
+              className={`w-full py-3 rounded-lg font-medium ${
+                selectedSeats.length === 0
+                  ? "bg-muted cursor-not-allowed"
+                  : "bg-primary text-white hover:opacity-90"
+              }`}
+            >
+              Confirm Booking
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   )
 }
-
-export default SeatLayout

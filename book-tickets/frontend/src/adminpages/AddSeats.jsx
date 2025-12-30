@@ -7,6 +7,7 @@ import "react-toastify/dist/ReactToastify.css";
 export default function SeatsPage() {
   const [cinemas, setCinemas] = useState([]);
   const [shows, setShows] = useState([]);
+  const [movies, setMovies] = useState([]); // ✅ NEW
   const [seatLayouts, setSeatLayouts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showAddSeats, setShowAddSeats] = useState(false);
@@ -14,6 +15,8 @@ export default function SeatsPage() {
   const [seatConfig, setSeatConfig] = useState({
     cinemaId: "",
     showId: "",
+    movieId: "",      // ✅ NEW
+    movieName: "",    // ✅ NEW
     hallName: "",
     rows: 5,
     columns: 8,
@@ -37,6 +40,16 @@ export default function SeatsPage() {
       .get("http://localhost:3000/api/shows")
       .then(res => setShows(res.data?.data || []))
       .catch(() => toast.error("Failed to load shows"));
+  }, []);
+
+  /* =======================
+     FETCH MOVIES (✅ NEW)
+  ======================== */
+  useEffect(() => {
+    axios
+      .get("http://localhost:3000/api/movies")
+      .then(res => setMovies(res.data?.data || []))
+      .catch(() => toast.error("Failed to load movies"));
   }, []);
 
   /* =======================
@@ -90,8 +103,14 @@ export default function SeatsPage() {
      CREATE SEATS
   ======================== */
   const handleCreateSeatLayout = async () => {
-    if (!seatConfig.cinemaId || !seatConfig.showId || !seatConfig.hallName) {
-      toast.warn("Cinema, Show and Hall Name required");
+    if (
+      !seatConfig.cinemaId ||
+      !seatConfig.showId ||
+      !seatConfig.movieId ||     // ✅ NEW
+      !seatConfig.movieName ||   // ✅ NEW
+      !seatConfig.hallName
+    ) {
+      toast.warn("Cinema, Show, Movie and Hall Name required");
       return;
     }
 
@@ -106,6 +125,8 @@ export default function SeatsPage() {
         {
           cinemaId: seatConfig.cinemaId,
           showId: seatConfig.showId,
+          movieId: seatConfig.movieId,       // ✅ NEW
+          movieName: seatConfig.movieName,   // ✅ NEW
           hallName: seatConfig.hallName,
           seats: generateSeats(seatConfig.rows, seatConfig.columns),
         },
@@ -123,7 +144,7 @@ export default function SeatsPage() {
   };
 
   /* =======================
-     DELETE SEATS (✅ FIXED)
+     DELETE SEATS
   ======================== */
   const handleDeleteSeats = async (
     cinemaId,
@@ -131,23 +152,14 @@ export default function SeatsPage() {
     showId,
     cinemaName
   ) => {
-    if (
-      !window.confirm(
-        `Delete seats for ${cinemaName} - ${hallName}?`
-      )
-    )
-      return;
+    if (!window.confirm(`Delete seats for ${cinemaName} - ${hallName}?`)) return;
 
     const token = localStorage.getItem("token");
     if (!token) return toast.error("Admin login required");
 
     try {
       await axios.delete("http://localhost:3000/api/seats", {
-        data: {
-          cinemaId,
-          hallName,
-          showId, // ✅ REQUIRED
-        },
+        data: { cinemaId, hallName, showId },
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -159,7 +171,7 @@ export default function SeatsPage() {
   };
 
   /* =======================
-     ROW LABEL (A, B, C...)
+     ROW LABEL
   ======================== */
   const rowLabel = n => String.fromCharCode(64 + n);
 
@@ -189,7 +201,7 @@ export default function SeatsPage() {
                   handleDeleteSeats(
                     layout.cinemaId,
                     layout.hallName,
-                    layout.showId, // ✅ FIX
+                    layout.showId,
                     layout.cinemaName
                   )
                 }
@@ -212,8 +224,8 @@ export default function SeatsPage() {
                     .map(seat => (
                       <div
                         key={seat._id}
-                        className={`w-6 h-6 rounded bg-gray-700 text-white 
-                        text-xs flex items-center justify-center ${
+                        className={`w-6 h-6 rounded bg-gray-700 text-white text-xs 
+                        flex items-center justify-center ${
                           seat.status === "BOOKED" ? "opacity-50" : ""
                         }`}
                       >
@@ -249,6 +261,7 @@ export default function SeatsPage() {
               Add Seat Layout
             </h3>
 
+            {/* CINEMA */}
             <select
               className="border px-3 py-2 rounded w-full mb-3"
               value={seatConfig.cinemaId}
@@ -264,6 +277,7 @@ export default function SeatsPage() {
               ))}
             </select>
 
+            {/* SHOW */}
             <select
               className="border px-3 py-2 rounded w-full mb-3"
               value={seatConfig.showId}
@@ -279,6 +293,28 @@ export default function SeatsPage() {
               ))}
             </select>
 
+            {/* MOVIE (✅ NEW) */}
+            <select
+              className="border px-3 py-2 rounded w-full mb-3"
+              value={seatConfig.movieId}
+              onChange={e => {
+                const movie = movies.find(m => m._id === e.target.value);
+                setSeatConfig({
+                  ...seatConfig,
+                  movieId: movie?._id || "",
+                  movieName: movie?.title || "",
+                });
+              }}
+            >
+              <option value="">Select Movie</option>
+              {movies.map(m => (
+                <option key={m._id} value={m._id}>
+                  {m.title}
+                </option>
+              ))}
+            </select>
+
+            {/* HALL */}
             <input
               placeholder="Hall Name"
               className="border px-3 py-2 rounded w-full mb-3"

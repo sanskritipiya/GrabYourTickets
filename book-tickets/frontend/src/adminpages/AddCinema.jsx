@@ -6,6 +6,10 @@ import "react-toastify/dist/ReactToastify.css";
 const CinemasPage = () => {
   const [cinemas, setCinemas] = useState([]);
   const [movies, setMovies] = useState([]);
+
+  // ✅ ADDED
+  const [shows, setShows] = useState([]);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const [cinemaData, setCinemaData] = useState({
@@ -24,6 +28,7 @@ const CinemasPage = () => {
   useEffect(() => {
     fetchCinemas();
     fetchMovies();
+    fetchShows(); // ✅ ADDED
   }, []);
 
   const fetchCinemas = async () => {
@@ -36,6 +41,13 @@ const CinemasPage = () => {
     const res = await fetch("http://localhost:3000/api/movies");
     const data = await res.json();
     setMovies(data.data || []);
+  };
+
+  // ✅ ADDED
+  const fetchShows = async () => {
+    const res = await fetch("http://localhost:3000/api/shows");
+    const data = await res.json();
+    setShows(data.data || []);
   };
 
   const addShowTime = () => {
@@ -71,7 +83,6 @@ const CinemasPage = () => {
     }
 
     try {
-      // Create cinema
       const cinemaRes = await fetch("http://localhost:3000/api/cinemas", {
         method: "POST",
         headers: {
@@ -84,7 +95,6 @@ const CinemasPage = () => {
       const cinemaJson = await cinemaRes.json();
       const cinemaId = cinemaJson.data._id;
 
-      // Create shows
       await Promise.all(
         showData.showTimes.map(time =>
           fetch("http://localhost:3000/api/shows", {
@@ -103,12 +113,12 @@ const CinemasPage = () => {
         )
       );
 
-      // ✅ SINGLE TOAST MESSAGE (cinemas + shows)
       toast.success("Cinemas and shows added successfully 🎬");
 
       setIsModalOpen(false);
       resetForm();
       fetchCinemas();
+      fetchShows(); // ✅ ADDED
     } catch (err) {
       toast.error("Something went wrong");
     }
@@ -148,11 +158,14 @@ const CinemasPage = () => {
     });
   };
 
+  // ✅ ADDED (helper only)
+  const getShowsForCinema = cinemaId =>
+    shows.filter(show => show.cinemaId?._id === cinemaId);
+
   /* ================= UI ================= */
 
   return (
     <>
-      {/* ✅ TOAST CONTAINER */}
       <ToastContainer position="top-right" autoClose={3000} />
 
       <div className="min-h-screen bg-gray-100 p-8">
@@ -193,12 +206,37 @@ const CinemasPage = () => {
                   <MapPin size={16} className="mr-1" />
                   {cinema.location}
                 </p>
+
+                {/* ✅ SHOWS ADDED */}
+                <div className="mt-4">
+                  <h4 className="font-semibold text-sm mb-2">Shows</h4>
+
+                  {getShowsForCinema(cinema._id).length === 0 ? (
+                    <p className="text-sm text-gray-400">No shows added</p>
+                  ) : (
+                    <ul className="space-y-2">
+                      {getShowsForCinema(cinema._id).map(show => (
+                        <li
+                          key={show._id}
+                          className="bg-gray-100 rounded px-3 py-2 text-sm"
+                        >
+                          <p className="font-medium">
+                            🎬 {show.movieId?.title}
+                          </p>
+                          <p className="text-gray-600">
+                            📅 {show.showDate} ⏰ {show.time}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* MODAL */}
+        {/* MODAL (UNCHANGED) */}
         {isModalOpen && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-white w-full max-w-2xl rounded-lg p-6">

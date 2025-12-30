@@ -11,6 +11,7 @@ export default function MovieForm({ movie, onSubmit, onCancel }) {
     releaseDate: movie?.releaseDate || "",
     trailer: movie?.trailer || movie?.trailerUrl || "",
     image: movie?.image || "",
+    isNewRelease: movie?.isNewRelease || false // ✅ ADDED
   });
 
   const [imageFile, setImageFile] = useState(null);
@@ -43,7 +44,8 @@ export default function MovieForm({ movie, onSubmit, onCancel }) {
       releaseDate: formData.releaseDate,
       description: formData.description,
       trailer: formData.trailer, // backend maps trailer -> trailerUrl
-      image: formData.image
+      image: formData.image,
+      isNewRelease: formData.isNewRelease // ✅ ADDED
     };
 
     onSubmit(submitData);
@@ -141,6 +143,24 @@ export default function MovieForm({ movie, onSubmit, onCancel }) {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
                 required
               />
+
+              {/* ✅ NEW RELEASE CHECKBOX (NO UI CHANGE) */}
+              <div className="flex items-center gap-2 mt-2">
+                <input
+                  type="checkbox"
+                  checked={formData.isNewRelease}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      isNewRelease: e.target.checked
+                    })
+                  }
+                  className="w-4 h-4 accent-red-600"
+                />
+                <label className="text-sm text-gray-700">
+                  Mark as New Release
+                </label>
+              </div>
             </div>
           </div>
 

@@ -1,88 +1,102 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { moviesData } from "../assets/assets"
+import axios from "axios"
 
 const HeroSection = () => {
   const navigate = useNavigate()
-  const allMoviesForHero = [
-    ...moviesData.action,
-    ...moviesData.sciFi,
-    ...moviesData.thriller,
-    ...moviesData.horror,
-    ...moviesData.romance,
-  ]
-
+  const [heroes, setHeroes] = useState([])
   const [currentIndex, setCurrentIndex] = useState(0)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    const fetchHeroes = async () => {
+      try {
+        const res = await axios.get("http://localhost:3000/api/heroes")
+        setHeroes(res.data.data || [])
+      } catch (error) {
+        console.error("Hero fetch error:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchHeroes()
+  }, [])
+
+  // 🔁 AUTO SLIDE
+  useEffect(() => {
+    if (heroes.length <= 1) return
+
     const interval = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % allMoviesForHero.length)
+      setCurrentIndex((prev) =>
+        prev === heroes.length - 1 ? 0 : prev + 1
+      )
     }, 5000)
+
     return () => clearInterval(interval)
-  }, [allMoviesForHero.length])
+  }, [heroes])
 
-  const currentMovie = allMoviesForHero[currentIndex]
-
-  const handlePrev = () => {
-    setCurrentIndex((prev) => (prev - 1 + allMoviesForHero.length) % allMoviesForHero.length)
-  }
-
-  const handleNext = () => {
-    setCurrentIndex((prev) => (prev + 1) % allMoviesForHero.length)
-  }
-
-  if (!currentMovie) return null
-
-  const imageUrl = currentMovie.image || '/popcorn.png'
+  if (loading || heroes.length === 0) return null
 
   return (
-    <div
-      className="relative h-96 md:h-[500px] bg-cover bg-center flex items-center justify-start overflow-hidden"
-      style={{
-        backgroundImage: `url(${imageUrl})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat'
-      }}
-    >
-      {/* Dark overlay */}
-      <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/60 to-black/40"></div>
+    <div className="relative overflow-hidden h-96 md:h-[500px]">
+      {/* SLIDER TRACK */}
+      <div
+        className="flex h-full transition-transform duration-700 ease-in-out"
+        style={{ transform: `translateX(-${currentIndex * 100}%)` }}
+      >
+        {heroes.map((hero) => {
+          const imageUrl = hero.backgroundImage || "/popcorn.png"
+          // Extract movieId - handle both string and populated object cases, ensure it's a string
+          const movieIdRaw = hero.movieId?._id || hero.movieId
+          const movieId = movieIdRaw ? String(movieIdRaw) : null
 
+          // Create a handler function for each hero to ensure correct movieId is used
+          const handleExploreClick = () => {
+            if (movieId) {
+              navigate(`/movie/${movieId}`)
+            }
+          }
 
-      <div className="relative z-10 text-left text-white max-w-3xl px-6 md:px-12">
-        <h1 className="text-4xl md:text-5xl font-bold mb-4">{currentMovie.title}</h1>
-        <div className="flex flex-wrap gap-4 mb-6 text-sm md:text-base">
-          {currentMovie.genre && <span className="bg-red-500 px-3 py-1 rounded">{currentMovie.genre}</span>}
-          {currentMovie.language && <span>{currentMovie.language}</span>}
-          {currentMovie.rating && <span>⭐ {currentMovie.rating}</span>}
-        </div>
-        {currentMovie.description && (
-          <p className="text-gray-200 mb-6 text-sm md:text-base line-clamp-2">{currentMovie.description}</p>
-        )}
-        <button 
-          onClick={() => navigate(`/movie/${currentMovie.id}`)}
-          className="bg-red-500 hover:bg-red-600 text-white px-8 py-3 rounded-full font-semibold transition"
-        >
-          Explore Now →
-        </button>
+          return (
+            <div
+              key={hero._id}
+              className="min-w-full h-full bg-cover bg-center flex items-center relative"
+              style={{ backgroundImage: `url(${imageUrl})` }}
+            >
+              <div className="absolute inset-0 bg-black/60"></div>
+
+              <div className="relative z-10 text-white px-6 md:px-12 max-w-3xl">
+                <h1 className="text-4xl md:text-5xl font-bold mb-2">
+                  {hero.title}
+                </h1>
+
+                {hero.subtitle && (
+                  <p className="text-lg text-gray-300 mb-4">
+                    {hero.subtitle}
+                  </p>
+                )}
+
+                {hero.description && (
+                  <p className="mb-6 text-gray-200">
+                    {hero.description}
+                  </p>
+                )}
+
+                {/* ✅ MOVIE ID BASED NAVIGATION - Always show button if movieId exists */}
+                {movieId && (
+                  <button
+                    onClick={handleExploreClick}
+                    className="bg-red-500 hover:bg-red-600 px-8 py-3 rounded-full font-semibold transition-colors"
+                  >
+                    {hero.ctaText || "Explore More"} →
+                  </button>
+                )}
+              </div>
+            </div>
+          )
+        })}
       </div>
-
-      {/* Navigation Buttons */}
-      <button
-        onClick={handlePrev}
-        className="absolute left-4 top-1/2 -translate-y-1/2 z-30 bg-black/70 hover:bg-black/90 text-white w-12 h-12 rounded-full flex items-center justify-center transition text-2xl font-bold shadow-lg"
-        aria-label="Previous movie"
-      >
-        ‹
-      </button>
-      <button
-        onClick={handleNext}
-        className="absolute right-4 top-1/2 -translate-y-1/2 z-30 bg-black/70 hover:bg-black/90 text-white w-12 h-12 rounded-full flex items-center justify-center transition text-2xl font-bold shadow-lg"
-        aria-label="Next movie"
-      >
-        ›
-      </button>
-
     </div>
   )
 }

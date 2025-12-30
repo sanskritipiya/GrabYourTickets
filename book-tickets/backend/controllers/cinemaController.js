@@ -2,7 +2,6 @@ const Cinema = require("../models/Cinema");
 const Show = require("../models/Show");
 
 
-
 // PUBLIC: Get all cinemas (optionally by location)
 exports.getAllCinemas = async (req, res) => {
   try {
