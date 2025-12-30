@@ -12,17 +12,17 @@ const {
 const { protect, admin } = require("../middleware/authMiddleware");
 const upload = require("../middleware/upload"); // multer
 
-
+// PUBLIC
 router.get("/", getAllHeroes);
 router.get("/:id", getHeroById);
 
-
+// ADMIN
 // ADD HERO (IMAGE REQUIRED)
 router.post(
   "/",
   protect,
   admin,
-  upload.single("backgroundImage"), 
+  upload.single("backgroundImage"),
   addHero
 );
 
@@ -31,7 +31,7 @@ router.put(
   "/:id",
   protect,
   admin,
-  upload.single("backgroundImage"), 
+  upload.single("backgroundImage"),
   updateHero
 );
 

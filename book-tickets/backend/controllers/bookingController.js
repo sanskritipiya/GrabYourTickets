@@ -343,4 +343,3 @@ exports.cancelBooking = async (req, res) => {
     });
   }
 };
-

@@ -23,4 +23,3 @@ router.get("/:id", protect, getBookingById);
 router.put("/:id/cancel", protect, cancelBooking);
 
 module.exports = router;
-
