@@ -32,6 +32,10 @@ const movieSchema = new mongoose.Schema({
   image: {
     type: String,
     required: true
+  },
+  isNewRelease: {
+    type: Boolean,
+    default: false
   }
 }, {
   timestamps: true

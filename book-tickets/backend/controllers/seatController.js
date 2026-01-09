@@ -1,30 +1,33 @@
 const Seat = require("../models/Seat");
 const mongoose = require("mongoose");
 
-const isValidObjectId = id =>
-  mongoose.Types.ObjectId.isValid(id);
+const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
+/* ================= ADD SEATS (SMART) ================= */
 /* ================= ADD SEATS (SMART) ================= */
 exports.addSeats = async (req, res) => {
   try {
-    const { cinemaId, showId, hallName, seats } = req.body;
+    const { cinemaId, showId, movieId, movieName, hallName, seats } = req.body;
 
     if (
       !isValidObjectId(cinemaId) ||
       !isValidObjectId(showId) ||
+      !isValidObjectId(movieId) ||
+      !movieName ||
       !hallName ||
       !Array.isArray(seats) ||
       seats.length === 0
     ) {
       return res.status(400).json({
         success: false,
-        message: "cinemaId, showId, hallName and seats are required",
+        message: "cinemaId, showId, movieId, movieName, hallName and seats are required",
       });
     }
 
-    // 🧠 Analyze rows & columns
-    const rows = [...new Set(seats.map(s => s.row))].sort();
-    const columns = [...new Set(seats.map(s => s.column))].sort((a, b) => a - b);
+    const rows = [...new Set(seats.map((s) => s.row))].sort();
+    const columns = [...new Set(seats.map((s) => s.column))].sort(
+      (a, b) => a - b
+    );
 
     const centerRowIndex = Math.floor(rows.length / 2);
     const bestRowIndexes = [
@@ -35,23 +38,22 @@ exports.addSeats = async (req, res) => {
 
     const centerColumn = columns[Math.floor(columns.length / 2)];
 
-    const seatDocs = seats.map(s => {
+    const seatDocs = seats.map((s) => {
       const rowIndex = rows.indexOf(s.row);
-      const rowLetter = String.fromCharCode(65 + rowIndex); // A B C
+      const rowLetter = String.fromCharCode(65 + rowIndex);
       const seatNumber = `${rowLetter}${s.column}`;
-
-      const isBestRow = bestRowIndexes.includes(rowIndex);
-      const isCenterSeat = Math.abs(s.column - centerColumn) <= 1;
 
       return {
         cinemaId,
         showId,
+        movieId,        // ✅ ADD THIS
+        movieName,      // ✅ ADD THIS
         hallName,
-        row: rowLetter,     // A B C
+        row: rowLetter,
         column: s.column,
-        seatNumber,         // A1 A2
-        isBestRow,
-        isCenterSeat,
+        seatNumber,
+        isBestRow: bestRowIndexes.includes(rowIndex),
+        isCenterSeat: Math.abs(s.column - centerColumn) <= 1,
         status: "AVAILABLE",
       };
     });
@@ -66,15 +68,21 @@ exports.addSeats = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
-
 /* ================= GET ALL SEATS ================= */
 exports.getAllSeats = async (req, res) => {
   try {
-    const seats = await Seat.find()
-      .populate("cinemaId")
-      .populate("showId");
+    const { cinemaId, showId } = req.query;
+    const filter = {};
 
-    res.json({ success: true, seats });
+    if (cinemaId && isValidObjectId(cinemaId)) filter.cinemaId = cinemaId;
+    if (showId && isValidObjectId(showId)) filter.showId = showId;
+
+    const seats = await Seat.find(filter)
+      .populate("cinemaId")
+      .populate("showId")
+      .sort({ row: 1, column: 1 });
+
+    res.json({ success: true, totalSeats: seats.length, seats });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -93,7 +101,7 @@ exports.getSeatsByHall = async (req, res) => {
     ) {
       return res.status(400).json({
         success: false,
-        message: "cinemaId, showId and hallName required",
+        message: "cinemaId, showId and hallName are required",
       });
     }
 
@@ -103,16 +111,19 @@ exports.getSeatsByHall = async (req, res) => {
       hallName,
     }).sort({ row: 1, column: 1 });
 
-    res.json({ success: true, seats });
+    res.json({ success: true, totalSeats: seats.length, seats });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 };
 
-/* ================= RECOMMEND SEATS ================= */
+/* ================= RECOMMEND SEATS (FIXED - RETURNS ALL GROUPS) ================= */
+/* ================= RECOMMEND SEATS (FIXED - SHOWS ALL ROWS) ================= */
 exports.recommendSeats = async (req, res) => {
   try {
     const { cinemaId, hallName, showId, count = 2, mode = "row" } = req.query;
+
+    console.log("Recommend seats params:", { cinemaId, hallName, showId, count, mode });
 
     if (
       !isValidObjectId(cinemaId) ||
@@ -125,12 +136,25 @@ exports.recommendSeats = async (req, res) => {
       });
     }
 
-    const seats = await Seat.find({
+    const seatCount = Math.min(Math.max(parseInt(count) || 2, 1), 20);
+
+    // Get all seats for this show/hall
+    const allSeats = await Seat.find({
       cinemaId,
       showId,
       hallName,
-      status: "AVAILABLE",
     }).lean();
+
+    console.log("Total seats found:", allSeats.length);
+    console.log("Sample seats:", allSeats.slice(0, 3).map(s => ({ 
+      seatNumber: s.seatNumber, 
+      status: s.status 
+    })));
+
+    // Filter for available seats
+    const seats = allSeats.filter(s => s.status === "AVAILABLE");
+
+    console.log("Available seats:", seats.length);
 
     if (!seats.length) {
       return res.status(404).json({
@@ -139,136 +163,133 @@ exports.recommendSeats = async (req, res) => {
       });
     }
 
-    // 🎯 BEST SEATS MODE: Return best seats from each row
-    if (mode === "best" || mode === "BEST") {
-      // Group seats by row
-      const rows = {};
-      seats.forEach(seat => {
-        if (!rows[seat.row]) rows[seat.row] = [];
-        rows[seat.row].push(seat);
-      });
-
-      // Get all available rows, prioritize best rows
-      const availableRows = Object.keys(rows).sort((a, b) => {
-        const aHasBest = rows[a].some(s => s.isBestRow);
-        const bHasBest = rows[b].some(s => s.isBestRow);
-        if (aHasBest && !bHasBest) return -1;
-        if (!aHasBest && bHasBest) return 1;
-        return a.localeCompare(b);
-      });
-
-      const recommendedSeats = [];
-
-      // For each row, find the best seat(s)
-      for (const row of availableRows) {
-        const rowSeats = rows[row].sort((a, b) => {
-          // Prioritize: best row + center seat > best row > center seat > others
-          const aScore = (a.isBestRow ? 10 : 0) + (a.isCenterSeat ? 5 : 0);
-          const bScore = (b.isBestRow ? 10 : 0) + (b.isCenterSeat ? 5 : 0);
-          if (bScore !== aScore) return bScore - aScore;
-          // If same score, prefer center columns
-          const centerCol = Math.floor(
-            (Math.min(...rowSeats.map(s => s.column)) +
-              Math.max(...rowSeats.map(s => s.column))) /
-              2
-          );
-          return (
-            Math.abs(a.column - centerCol) - Math.abs(b.column - centerCol)
-          );
-        });
-
-        // Take up to 2 best seats from each row
-        const seatsFromRow = rowSeats.slice(0, 2);
-        recommendedSeats.push(...seatsFromRow);
-
-        // Limit total recommendations to 8-10 seats
-        if (recommendedSeats.length >= 10) break;
-      }
-
-      return res.json({
-        success: true,
-        recommendedSeats: recommendedSeats.map(seat => ({
-          seatId: seat._id,
-          label: seat.seatNumber || `${seat.row}${seat.column}`,
-          row: seat.row,
-          column: seat.column,
-        })),
-      });
-    }
-
-    // 🎯 SAME ROW MODE: Find consecutive seats in the same row
-    // ⭐ Prioritize best rows first
-    seats.sort((a, b) => {
-      if (b.isBestRow !== a.isBestRow) return b.isBestRow - a.isBestRow;
-      return a.row.localeCompare(b.row);
-    });
-
+    // Group seats by row
     const rows = {};
-    seats.forEach(seat => {
+    seats.forEach((seat) => {
       if (!rows[seat.row]) rows[seat.row] = [];
       rows[seat.row].push(seat);
     });
 
-    for (const row in rows) {
+    /* ================= BEST MODE (TOP 5 GROUPS ACROSS ALL ROWS) ================= */
+    if (mode.toLowerCase() === "best") {
+      const allGroups = [];
+
+      for (const row of Object.keys(rows).sort()) {
+        const rowSeats = rows[row].sort((a, b) => a.column - b.column);
+
+        for (let i = 0; i <= rowSeats.length - seatCount; i++) {
+          let valid = true;
+
+          for (let j = 1; j < seatCount; j++) {
+            if (rowSeats[i + j].column !== rowSeats[i].column + j) {
+              valid = false;
+              break;
+            }
+          }
+
+          if (valid) {
+            const group = rowSeats.slice(i, i + seatCount);
+            const score = group.reduce(
+              (s, seat) =>
+                s + (seat.isBestRow ? 10 : 0) + (seat.isCenterSeat ? 5 : 0),
+              0
+            );
+
+            allGroups.push({ group, score });
+          }
+        }
+      }
+
+      if (!allGroups.length) {
+        return res.status(404).json({
+          success: false,
+          message: "No consecutive seats found",
+        });
+      }
+
+      // Sort by score and return top 5 groups
+      allGroups.sort((a, b) => b.score - a.score);
+      const topGroups = allGroups.slice(0, 5);
+
+      console.log("Best mode - returning", topGroups.length, "groups");
+
+      return res.json({
+        success: true,
+        recommendedGroups: topGroups.map((g) => ({
+          row: g.group[0].row,
+          score: g.score,
+          seats: g.group.map((seat) => ({
+            seatId: seat._id,
+            label: seat.seatNumber,
+            row: seat.row,
+            column: seat.column,
+          })),
+        })),
+      });
+    }
+
+    /* ================= ROW MODE (BEST GROUP IN EACH ROW) ================= */
+    const bestInEachRow = [];
+
+    for (const row of Object.keys(rows).sort()) {
       const rowSeats = rows[row].sort((a, b) => a.column - b.column);
+      const rowGroups = [];
 
-      for (let i = 0; i <= rowSeats.length - count; i++) {
-        let consecutive = true;
+      for (let i = 0; i <= rowSeats.length - seatCount; i++) {
+        let valid = true;
 
-        for (let j = 1; j < count; j++) {
+        for (let j = 1; j < seatCount; j++) {
           if (rowSeats[i + j].column !== rowSeats[i].column + j) {
-            consecutive = false;
+            valid = false;
             break;
           }
         }
 
-        if (consecutive) {
-          return res.json({
-            success: true,
-            recommendedSeats: rowSeats.slice(i, i + count).map(seat => ({
-              seatId: seat._id,
-              label: seat.seatNumber || `${seat.row}${seat.column}`,
-              row: seat.row,
-              column: seat.column,
-            })),
-          });
+        if (valid) {
+          const group = rowSeats.slice(i, i + seatCount);
+          const score = group.reduce(
+            (s, seat) =>
+              s + (seat.isBestRow ? 10 : 0) + (seat.isCenterSeat ? 5 : 0),
+            0
+          );
+
+          rowGroups.push({ group, score });
         }
+      }
+
+      // Get the best group in this row
+      if (rowGroups.length > 0) {
+        rowGroups.sort((a, b) => b.score - a.score);
+        const bestGroup = rowGroups[0];
+        
+        bestInEachRow.push({
+          row: bestGroup.group[0].row,
+          score: bestGroup.score,
+          seats: bestGroup.group.map((seat) => ({
+            seatId: seat._id,
+            label: seat.seatNumber,
+            row: seat.row,
+            column: seat.column,
+          })),
+        });
       }
     }
 
-    res.status(404).json({
-      success: false,
-      message: "No consecutive seats found",
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-};
-
-/* ================= BOOK SEAT ================= */
-exports.bookSeat = async (req, res) => {
-  try {
-    const { seatId } = req.body;
-
-    if (!isValidObjectId(seatId)) {
-      return res.status(400).json({ success: false, message: "Invalid seatId" });
-    }
-
-    const seat = await Seat.findOneAndUpdate(
-      { _id: seatId, status: "AVAILABLE" },
-      { status: "BOOKED" },
-      { new: true }
-    );
-
-    if (!seat) {
-      return res.status(400).json({
+    if (!bestInEachRow.length) {
+      return res.status(404).json({
         success: false,
-        message: "Seat already booked",
+        message: "No consecutive seats available",
       });
     }
 
-    res.json({ success: true, seat });
+    console.log("Row mode - returning", bestInEachRow.length, "groups (one per row)");
+
+    res.json({
+      success: true,
+      recommendedGroups: bestInEachRow,
+    });
   } catch (err) {
+    console.error("Recommend seats error:", err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
@@ -276,13 +297,13 @@ exports.bookSeat = async (req, res) => {
 /* ================= GET SEAT BY ID ================= */
 exports.getSeatById = async (req, res) => {
   try {
-    const { seatId } = req.params;
+    const { id } = req.params;
 
-    if (!isValidObjectId(seatId)) {
-      return res.status(400).json({ success: false, message: "Invalid seatId" });
+    if (!isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: "Invalid seat ID" });
     }
 
-    const seat = await Seat.findById(seatId);
+    const seat = await Seat.findById(id);
 
     if (!seat) {
       return res.status(404).json({ success: false, message: "Seat not found" });
@@ -294,7 +315,7 @@ exports.getSeatById = async (req, res) => {
   }
 };
 
-/* ================= EDIT SEAT ================= */
+// EDIT SEAT//
 exports.editSeat = async (req, res) => {
   try {
     const { seatId, row, column, status } = req.body;
@@ -303,11 +324,13 @@ exports.editSeat = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid seatId" });
     }
 
-    const seat = await Seat.findByIdAndUpdate(
-      seatId,
-      { row, column, status },
-      { new: true }
-    );
+    const update = {};
+    if (row) update.row = row;
+    if (column) update.column = column;
+    if (row && column) update.seatNumber = `${row}${column}`;
+    if (status) update.status = status;
+
+    const seat = await Seat.findByIdAndUpdate(seatId, update, { new: true });
 
     res.json({ success: true, seat });
   } catch (err) {
@@ -315,22 +338,31 @@ exports.editSeat = async (req, res) => {
   }
 };
 
-/* ================= DELETE SEATS BY HALL ================= */
+// DELETE SEATS (BY CINEMA + HALL + SHOW) //
 exports.deleteSeatsByHall = async (req, res) => {
   try {
-    const { cinemaId, hallName } = req.body;
+    const { cinemaId, hallName, showId } = req.body;
 
-    if (!cinemaId || !hallName) {
+    if (
+      !isValidObjectId(cinemaId) ||
+      !isValidObjectId(showId) ||
+      !hallName
+    ) {
       return res.status(400).json({
         success: false,
-        message: "cinemaId and hallName required",
+        message: "cinemaId, hallName and showId are required",
       });
     }
 
-    await Seat.deleteMany({ cinemaId, hallName });
+    const result = await Seat.deleteMany({
+      cinemaId,
+      hallName,
+      showId,
+    });
 
     res.json({
       success: true,
+      deletedCount: result.deletedCount,
       message: "Seats deleted successfully",
     });
   } catch (err) {

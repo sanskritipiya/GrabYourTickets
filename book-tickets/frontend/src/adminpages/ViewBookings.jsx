@@ -1,84 +1,96 @@
-import React, { useState } from "react";
-import { Search, Download } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Search, Trash2 } from "lucide-react";
+import axios from "axios";
 
 export default function ViewBookings() {
-  const [bookings] = useState([
-    {
-      id: 1,
-      bookingId: "BK001",
-      userName: "John Doe",
-      email: "john@example.com",
-      movie: "Inception",
-      show: "2024-12-18 14:00",
-      hall: "Hall 1",
-      seats: "A1, A2, A3",
-      total: 45,
-      status: "Confirmed",
-    },
-    {
-      id: 2,
-      bookingId: "BK002",
-      userName: "Sarah Smith",
-      email: "sarah@example.com",
-      movie: "The Dark Knight",
-      show: "2024-12-18 16:30",
-      hall: "Hall 2",
-      seats: "B5, B6",
-      total: 30,
-      status: "Confirmed",
-    },
-    {
-      id: 3,
-      bookingId: "BK003",
-      userName: "Mike Johnson",
-      email: "mike@example.com",
-      movie: "Interstellar",
-      show: "2024-12-18 19:00",
-      hall: "Hall 3",
-      seats: "C1, C2, C3, C4",
-      total: 60,
-      status: "Confirmed",
-    },
-    {
-      id: 4,
-      bookingId: "BK004",
-      userName: "Emily Brown",
-      email: "emily@example.com",
-      movie: "Avatar",
-      show: "2024-12-19 15:00",
-      hall: "Hall 1",
-      seats: "D10, D11",
-      total: 30,
-      status: "Pending",
-    },
-    {
-      id: 5,
-      bookingId: "BK005",
-      userName: "David Wilson",
-      email: "david@example.com",
-      movie: "The Matrix",
-      show: "2024-12-19 18:00",
-      hall: "Hall 2",
-      seats: "E1, E2, E3, E4, E5",
-      total: 75,
-      status: "Confirmed",
-    },
-    {
-      id: 6,
-      bookingId: "BK006",
-      userName: "Lisa Anderson",
-      email: "lisa@example.com",
-      movie: "Inception",
-      show: "2024-12-20 14:00",
-      hall: "Hall 1",
-      seats: "F5, F6",
-      total: 30,
-      status: "Cancelled",
-    },
-  ]);
-
+  const [bookings, setBookings] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
+  // ================= FETCH ALL BOOKINGS (ADMIN) =================
+  useEffect(() => {
+    const fetchBookings = async () => {
+      try {
+        const token = localStorage.getItem("token");
+
+        if (!token) {
+          throw new Error("No authentication token found");
+        }
+
+        // ✅ YOUR BACKEND API (UNCHANGED)
+        const res = await axios.get(
+          "http://localhost:3000/api/bookings/all",
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        const bookingsData = res.data?.data || [];
+
+        const formattedBookings = bookingsData.map((b) => ({
+          id: b._id, // 🔥 REAL MongoDB ID
+          bookingId: b._id.slice(-6).toUpperCase(), // UI DISPLAY ONLY
+          userName: b.userId?.name || "N/A",
+          email: b.userId?.email || "N/A",
+          movie: b.showId?.movieId?.title || "N/A",
+          show: `${b.showId?.showDate || "N/A"} ${b.showId?.time || ""}`.trim(),
+          hall: b.showId?.cinemaId?.name || "N/A",
+          seats: Array.isArray(b.seatIds)
+            ? b.seatIds.map((s) => s.seatNumber).join(", ")
+            : "N/A",
+          total: b.totalAmount || 0,
+          status: b.bookingStatus || "PENDING",
+        }));
+
+        setBookings(formattedBookings);
+        setError(null);
+      } catch (error) {
+        console.error("Failed to fetch bookings:", error);
+
+        if (error.response?.status === 403) {
+          setError("Access denied. Admin privileges required.");
+        } else if (error.response?.status === 401) {
+          setError("Unauthorized. Please log in again.");
+        } else {
+          setError(error.response?.data?.message || "Failed to load bookings");
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchBookings();
+  }, []);
+
+  // ================= DELETE BOOKING (ADMIN FORCE DELETE) =================
+  const handleDeleteBooking = async (bookingId) => {
+    if (!window.confirm("Are you sure you want to delete this booking?")) return;
+
+    try {
+      const token = localStorage.getItem("token");
+
+      // 🔥 ONLY CHANGE IS HERE (FORCE DELETE API)
+      await axios.delete(
+        `http://localhost:3000/api/bookings/admin/force/${bookingId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      // Remove from UI instantly
+      setBookings((prev) => prev.filter((b) => b.id !== bookingId));
+    } catch (error) {
+      console.error("Delete failed:", error);
+      alert(error.response?.data?.message || "Failed to delete booking");
+    }
+  };
+
+  // ================= SEARCH FILTER =================
   const filteredBookings = bookings.filter(
     (booking) =>
       booking.bookingId.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -87,47 +99,59 @@ export default function ViewBookings() {
       booking.movie.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // ================= STATUS COLOR =================
   const getStatusColor = (status) => {
     switch (status) {
-      case "Confirmed":
+      case "CONFIRMED":
         return "bg-green-100 text-green-800";
-      case "Pending":
+      case "PENDING":
         return "bg-yellow-100 text-yellow-800";
-      case "Cancelled":
+      case "CANCELLED":
         return "bg-red-100 text-red-800";
       default:
         return "bg-gray-100 text-gray-800";
     }
   };
 
-  const handleExport = () => {
-    console.log("Exporting bookings...");
-    alert("Booking data exported successfully!");
-  };
+  // ================= UI STATES =================
+  if (loading) {
+    return (
+      <p className="text-center text-gray-500 py-8">
+        Loading bookings...
+      </p>
+    );
+  }
 
+  if (error) {
+    return (
+      <div className="max-w-2xl mx-auto mt-8">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+          <h3 className="text-red-800 font-semibold mb-2">
+            Error Loading Bookings
+          </h3>
+          <p className="text-red-600">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ================= MAIN UI =================
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight text-gray-900">User Bookings</h2>
-          <p className="text-gray-600">View and manage all customer bookings</p>
-        </div>
-        <button
-          onClick={handleExport}
-          className="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-        >
-          <Download className="w-4 h-4 mr-2" />
-          Export Data
-        </button>
+      <div>
+        <h2 className="text-3xl font-bold tracking-tight text-gray-900">
+          User Bookings
+        </h2>
+        <p className="text-gray-600">
+          View and manage all customer bookings
+        </p>
       </div>
 
+      {/* Search */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-        <div className="p-6 border-b border-gray-200">
-          <h3 className="text-lg font-semibold">Search Bookings</h3>
-        </div>
         <div className="p-6">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-4 h-4" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 w-4 h-4" />
             <input
               type="text"
               placeholder="Search by booking ID, user name, email, or movie..."
@@ -139,41 +163,54 @@ export default function ViewBookings() {
         </div>
       </div>
 
+      {/* Table */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-        <div className="p-6 border-b border-gray-200">
-          <h3 className="text-lg font-semibold">All Bookings ({filteredBookings.length})</h3>
-        </div>
-        <div className="p-6">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Booking ID</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">User</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Movie</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Show Time</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Hall</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Seats</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Total</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Status</th>
+        <div className="p-6 overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-gray-200">
+                <th className="px-4 py-3 text-left text-sm">Booking ID</th>
+                <th className="px-4 py-3 text-left text-sm">User</th>
+                <th className="px-4 py-3 text-left text-sm">Movie</th>
+                <th className="px-4 py-3 text-left text-sm">Show Time</th>
+                <th className="px-4 py-3 text-left text-sm">Hall</th>
+                <th className="px-4 py-3 text-left text-sm">Seats</th>
+                <th className="px-4 py-3 text-left text-sm">Total</th>
+                <th className="px-4 py-3 text-left text-sm">Status</th>
+                <th className="px-4 py-3 text-left text-sm">Action</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {filteredBookings.length === 0 ? (
+                <tr>
+                  <td colSpan="9" className="px-4 py-6 text-center text-gray-500">
+                    No bookings found
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {filteredBookings.map((booking) => (
-                  <tr key={booking.id} className="border-b border-gray-200 hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm font-medium text-red-600">{booking.bookingId}</td>
-                    <td className="px-4 py-3 text-sm">
-                      <div>
-                        <div className="font-medium text-gray-900">{booking.userName}</div>
-                        <div className="text-gray-500 text-xs">{booking.email}</div>
+              ) : (
+                filteredBookings.map((booking) => (
+                  <tr
+                    key={booking.id}
+                    className="border-b border-gray-200 hover:bg-gray-50"
+                  >
+                    <td className="px-4 py-3 font-medium text-red-600">
+                      {booking.bookingId}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="font-medium">{booking.userName}</div>
+                      <div className="text-xs text-gray-500">
+                        {booking.email}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-900">{booking.movie}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900">{booking.show}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900">{booking.hall}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900">{booking.seats}</td>
-                    <td className="px-4 py-3 text-sm font-semibold text-red-600">${booking.total}</td>
-                    <td className="px-4 py-3 text-sm">
+                    <td className="px-4 py-3">{booking.movie}</td>
+                    <td className="px-4 py-3">{booking.show}</td>
+                    <td className="px-4 py-3">{booking.hall}</td>
+                    <td className="px-4 py-3">{booking.seats}</td>
+                    <td className="px-4 py-3 font-semibold text-red-600">
+                      Rs. {booking.total}
+                    </td>
+                    <td className="px-4 py-3">
                       <span
                         className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
                           booking.status
@@ -182,11 +219,23 @@ export default function ViewBookings() {
                         {booking.status}
                       </span>
                     </td>
+                    <td className="px-4 py-3">
+                      {(booking.userName === "N/A" ||
+                        booking.status === "CANCELLED") && (
+                        <button
+                          onClick={() => handleDeleteBooking(booking.id)}
+                          className="text-red-600 hover:text-red-800 flex items-center gap-1"
+                        >
+                          <Trash2 size={14} />
+                          Delete
+                        </button>
+                      )}
+                    </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

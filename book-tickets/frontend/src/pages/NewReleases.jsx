@@ -12,11 +12,17 @@ const NewReleases = () => {
     const fetchNewReleases = async () => {
       try {
         setLoading(true);
+        setError(null);
         const res = await axios.get("http://localhost:3000/api/movies/new-releases");
-        setMovies(res.data?.data || []);
+        
+        console.log("New releases response:", res.data);
+        const movies = res.data?.data || [];
+        console.log(`Loaded ${movies.length} new release movies`);
+        
+        setMovies(movies);
       } catch (err) {
         console.error("Failed to fetch new releases:", err);
-        setError("Failed to load new releases");
+        setError(err.response?.data?.message || "Failed to load new releases");
       } finally {
         setLoading(false);
       }

@@ -1,17 +1,37 @@
 const Show = require("../models/Show");
+const Cinema = require("../models/Cinema"); 
 
 exports.getAllShows = async (req, res) => {
   try {
-    const { movieId } = req.query;
+    const { movieId, location } = req.query;
+    const showFilter = {};
 
-    const filter = {};
     if (movieId) {
-      filter.movieId = movieId;
+      showFilter.movieId = movieId;
     }
 
-    const shows = await Show.find(filter)
+    if (location && location.trim() !== "") {
+      const safeLocation = location.trim();
+
+      const cinemas = await Cinema.find({
+        location: {
+          $regex: `.*${safeLocation}.*`,
+          $options: "i"
+        }
+      }).select("_id");
+
+      const cinemaIds = cinemas.map(c => c._id);
+
+      if (cinemaIds.length === 0) {
+        return res.json({ success: true, data: [] });
+      }
+
+      showFilter.cinemaId = { $in: cinemaIds };
+    }
+
+    const shows = await Show.find(showFilter)
       .populate("cinemaId", "name location")
-      .populate("movieId", "title")
+      .populate("movieId", "title poster duration genre")
       .sort({ showDate: 1, time: 1 });
 
     res.json({ success: true, data: shows });

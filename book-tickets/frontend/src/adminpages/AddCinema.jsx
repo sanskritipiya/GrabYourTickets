@@ -1,16 +1,12 @@
 import { useEffect, useState } from "react";
-import { Plus, MapPin } from "lucide-react";
-import { toast, ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import { Plus, MapPin, AlertTriangle, AlertCircle, CheckCircle, X } from "lucide-react";
 
 const CinemasPage = () => {
   const [cinemas, setCinemas] = useState([]);
   const [movies, setMovies] = useState([]);
-
-  // ✅ ADDED
   const [shows, setShows] = useState([]);
-
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [toast, setToast] = useState(null);
 
   const [cinemaData, setCinemaData] = useState({
     name: "",
@@ -25,10 +21,16 @@ const CinemasPage = () => {
 
   const token = localStorage.getItem("token");
 
+  // Custom Toast Function
+  const showToast = (message, type = "success") => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
   useEffect(() => {
     fetchCinemas();
     fetchMovies();
-    fetchShows(); // ✅ ADDED
+    fetchShows();
   }, []);
 
   const fetchCinemas = async () => {
@@ -43,7 +45,6 @@ const CinemasPage = () => {
     setMovies(data.data || []);
   };
 
-  // ✅ ADDED
   const fetchShows = async () => {
     const res = await fetch("http://localhost:3000/api/shows");
     const data = await res.json();
@@ -68,8 +69,6 @@ const CinemasPage = () => {
     setShowData({ movieId: "", showDate: "", showTimes: [""] });
   };
 
-  /* ================= SUBMIT ================= */
-
   const handleSubmit = async () => {
     if (
       !cinemaData.name ||
@@ -78,7 +77,7 @@ const CinemasPage = () => {
       !showData.showDate ||
       showData.showTimes.some(t => !t)
     ) {
-      toast.error("Please fill all required fields");
+      showToast("Please fill all required fields", "error");
       return;
     }
 
@@ -113,60 +112,101 @@ const CinemasPage = () => {
         )
       );
 
-      toast.success("Cinemas and shows added successfully 🎬");
+      showToast("Cinemas and shows added successfully", "success");
 
       setIsModalOpen(false);
       resetForm();
       fetchCinemas();
-      fetchShows(); // ✅ ADDED
+      fetchShows();
     } catch (err) {
-      toast.error("Something went wrong");
+      showToast("Something went wrong", "error");
     }
   };
 
-  /* ================= DELETE ================= */
-
-  const handleDeleteCinema = (cinemaId) => {
+  const handleDeleteCinema = async (cinemaId) => {
     if (!window.confirm("Delete this cinema and all its shows?")) return;
 
     const previousCinemas = cinemas;
     setCinemas(prev => prev.filter(c => c._id !== cinemaId));
 
-    const deleteRequest = fetch(
-      `http://localhost:3000/api/cinemas/${cinemaId}`,
-      {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`
+    try {
+      const res = await fetch(
+        `http://localhost:3000/api/cinemas/${cinemaId}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
         }
-      }
-    ).then(async res => {
+      );
+
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
-      return data;
-    });
-
-    toast.promise(deleteRequest, {
-      pending: "Deleting cinema and shows...",
-      success: "Cinema and shows deleted successfully 🎟️",
-      error: {
-        render({ data }) {
-          setCinemas(previousCinemas);
-          return data?.message || "Failed to delete cinema";
-        }
-      }
-    });
+      
+      showToast("Cinema and shows deleted successfully", "success");
+    } catch (err) {
+      setCinemas(previousCinemas);
+      showToast(err.message || "Failed to delete cinema", "error");
+    }
   };
 
-  // ✅ ADDED (helper only)
   const getShowsForCinema = cinemaId =>
     shows.filter(show => show.cinemaId?._id === cinemaId);
 
-  /* ================= UI ================= */
+  const getToastStyles = () => {
+    switch (toast?.type) {
+      case "warning":
+        return {
+          bg: "bg-yellow-50",
+          border: "border-yellow-200",
+          icon: <AlertTriangle className="w-6 h-6 text-yellow-600" />,
+          text: "text-yellow-800",
+        };
+      case "error":
+        return {
+          bg: "bg-red-50",
+          border: "border-red-200",
+          icon: <AlertCircle className="w-6 h-6 text-red-600" />,
+          text: "text-red-800",
+        };
+      case "success":
+        return {
+          bg: "bg-green-50",
+          border: "border-green-200",
+          icon: <CheckCircle className="w-6 h-6 text-green-600" />,
+          text: "text-green-800",
+        };
+      default:
+        return {
+          bg: "bg-blue-50",
+          border: "border-blue-200",
+          icon: <AlertCircle className="w-6 h-6 text-blue-600" />,
+          text: "text-blue-800",
+        };
+    }
+  };
 
   return (
     <>
-      <ToastContainer position="top-right" autoClose={3000} />
+      {/* Custom Toast */}
+      {toast && (
+        <div className="fixed top-6 left-1/2 transform -translate-x-1/2 z-50 animate-fade-in">
+          <div
+            className={`${getToastStyles().bg} ${getToastStyles().border} border rounded-lg px-6 py-4 shadow-lg min-w-[400px] max-w-[500px]`}
+          >
+            <div className="flex items-center gap-4">
+              <div className="flex-shrink-0">{getToastStyles().icon}</div>
+              <p className={`${getToastStyles().text} font-medium flex-1`}>{toast.message}</p>
+              <button
+                onClick={() => setToast(null)}
+                className={`flex-shrink-0 ${getToastStyles().text} opacity-40 hover:opacity-100 transition-opacity`}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="min-h-screen bg-gray-100 p-8">
         <div className="max-w-7xl mx-auto">
@@ -207,7 +247,6 @@ const CinemasPage = () => {
                   {cinema.location}
                 </p>
 
-                {/* ✅ SHOWS ADDED */}
                 <div className="mt-4">
                   <h4 className="font-semibold text-sm mb-2">Shows</h4>
 
@@ -236,7 +275,6 @@ const CinemasPage = () => {
           </div>
         </div>
 
-        {/* MODAL (UNCHANGED) */}
         {isModalOpen && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-white w-full max-w-2xl rounded-lg p-6">

@@ -14,13 +14,24 @@ const seatSchema = new mongoose.Schema(
       required: true,
     },
 
+    movieId: {  // ✅ NEW FIELD
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Movie",
+      required: true,
+    },
+
+    movieName: {  // ✅ NEW FIELD
+      type: String,
+      required: true,
+      trim: true,
+    },
+
     hallName: {
       type: String,
       required: true,
       trim: true,
     },
 
-    // ✅ FIXED: Row is STRING (A, B, C...)
     row: {
       type: String,
       required: true,
@@ -28,26 +39,22 @@ const seatSchema = new mongoose.Schema(
       trim: true,
     },
 
-    // Seat number: 1,2,3,4...
     column: {
       type: Number,
       required: true,
       min: 1,
     },
 
-    // Seat identifier: A1, A2, B1, etc.
     seatNumber: {
       type: String,
       trim: true,
     },
 
-    // Best row indicator (middle rows are usually best)
     isBestRow: {
       type: Boolean,
       default: false,
     },
 
-    // Center seat indicator (seats near center column)
     isCenterSeat: {
       type: Boolean,
       default: false,
@@ -62,13 +69,13 @@ const seatSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// ✅ Prevent duplicate seats
+// Prevent duplicate seats
 seatSchema.index(
   { cinemaId: 1, showId: 1, hallName: 1, row: 1, column: 1 },
   { unique: true }
 );
 
-// ✅ Speed up recommendation queries
+// Speed up seat availability queries
 seatSchema.index({
   cinemaId: 1,
   showId: 1,

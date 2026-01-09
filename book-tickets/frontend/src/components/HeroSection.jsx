@@ -40,23 +40,13 @@ const HeroSection = () => {
 
   return (
     <div className="relative overflow-hidden h-96 md:h-[500px]">
-      {/* SLIDER TRACK */}
       <div
         className="flex h-full transition-transform duration-700 ease-in-out"
         style={{ transform: `translateX(-${currentIndex * 100}%)` }}
       >
         {heroes.map((hero) => {
           const imageUrl = hero.backgroundImage || "/popcorn.png"
-          // Extract movieId - handle both string and populated object cases, ensure it's a string
-          const movieIdRaw = hero.movieId?._id || hero.movieId
-          const movieId = movieIdRaw ? String(movieIdRaw) : null
-
-          // Create a handler function for each hero to ensure correct movieId is used
-          const handleExploreClick = () => {
-            if (movieId) {
-              navigate(`/movie/${movieId}`)
-            }
-          }
+          const movieId = hero.movieId?._id || hero.movieId
 
           return (
             <div
@@ -64,7 +54,7 @@ const HeroSection = () => {
               className="min-w-full h-full bg-cover bg-center flex items-center relative"
               style={{ backgroundImage: `url(${imageUrl})` }}
             >
-              <div className="absolute inset-0 bg-black/60"></div>
+              <div className="absolute inset-0 bg-black/60" />
 
               <div className="relative z-10 text-white px-6 md:px-12 max-w-3xl">
                 <h1 className="text-4xl md:text-5xl font-bold mb-2">
@@ -83,14 +73,17 @@ const HeroSection = () => {
                   </p>
                 )}
 
-                {/* ✅ MOVIE ID BASED NAVIGATION - Always show button if movieId exists */}
-                {movieId && (
+                {movieId ? (
                   <button
-                    onClick={handleExploreClick}
+                    onClick={() => navigate(`/movie/${movieId}`)}
                     className="bg-red-500 hover:bg-red-600 px-8 py-3 rounded-full font-semibold transition-colors"
                   >
-                    {hero.ctaText || "Explore More"} →
+                    Explore More →
                   </button>
+                ) : (
+                  <div className="text-red-400 bg-red-900/30 px-4 py-2 rounded inline-block">
+                    ⚠️ No movie linked to this hero
+                  </div>
                 )}
               </div>
             </div>

@@ -9,6 +9,9 @@ const cinemaSchema = new mongoose.Schema(
     location: {
       type: String,
       required: true   // 👈 recommended
+    },
+    area:{
+      type: String,
     }
   },
   { timestamps: true }

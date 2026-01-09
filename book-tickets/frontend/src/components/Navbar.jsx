@@ -63,7 +63,7 @@ export default function Navbar() {
         {/* Logo (LEFT) */}
         <Link to="/" className="flex items-center gap-2">
           <img
-            src="/logo.png"
+            src="/popcorn.png"
             alt="GrabYourTickets Logo"
             className="w-10 h-10 object-contain"
           />

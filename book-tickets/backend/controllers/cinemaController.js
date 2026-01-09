@@ -2,19 +2,23 @@ const Cinema = require("../models/Cinema");
 const Show = require("../models/Show");
 
 
-// PUBLIC: Get all cinemas (optionally by location)
+/// GET ALL CINEMAS (SAFE LOCATION FILTER)
 exports.getAllCinemas = async (req, res) => {
   try {
     const filter = {};
 
-    // Optional location filter
-    if (req.query.location) {
-      filter.location = req.query.location;
+    if (req.query.location && req.query.location !== "All") {
+      const location = decodeURIComponent(req.query.location).trim();
+
+      // Use case-insensitive regex without word boundaries
+      filter.location = {
+        $regex: new RegExp(location, "i")
+      };
     }
 
-    const cinemas = await Cinema.find(filter);
+    const cinemas = await Cinema.find(filter).sort({ name: 1 });
 
-    res.json({
+    res.status(200).json({
       success: true,
       data: cinemas
     });
@@ -26,7 +30,7 @@ exports.getAllCinemas = async (req, res) => {
   }
 };
 
-// PUBLIC: Get cinema by ID
+// GET CINEMA BY ID
 exports.getCinemaById = async (req, res) => {
   try {
     const cinema = await Cinema.findById(req.params.id);
@@ -38,7 +42,7 @@ exports.getCinemaById = async (req, res) => {
       });
     }
 
-    res.json({
+    res.status(200).json({
       success: true,
       data: cinema
     });
@@ -50,7 +54,7 @@ exports.getCinemaById = async (req, res) => {
   }
 };
 
-// PUBLIC: Get cinema with its shows
+// GET CINEMA WITH ITS SHOWS
 exports.getCinemaWithShows = async (req, res) => {
   try {
     const cinema = await Cinema.findById(req.params.id);
@@ -63,15 +67,12 @@ exports.getCinemaWithShows = async (req, res) => {
     }
 
     const shows = await Show.find({ cinemaId: cinema._id })
-      .populate("movieId", "title")
+      .populate("movieId", "title poster duration genre")
       .sort({ showDate: 1, time: 1 });
 
-    res.json({
+    res.status(200).json({
       success: true,
-      data: {
-        cinema,
-        shows
-      }
+      data: { cinema, shows }
     });
   } catch (error) {
     res.status(500).json({
@@ -81,9 +82,8 @@ exports.getCinemaWithShows = async (req, res) => {
   }
 };
 
-/* ================= ADMIN ================= */
+// ADMIN SIDE//
 
-// ADMIN: Add cinema
 exports.addCinema = async (req, res) => {
   try {
     const cinema = await Cinema.create(req.body);
@@ -100,7 +100,6 @@ exports.addCinema = async (req, res) => {
   }
 };
 
-// ADMIN: Update cinema
 exports.updateCinema = async (req, res) => {
   try {
     const cinema = await Cinema.findByIdAndUpdate(
@@ -116,7 +115,7 @@ exports.updateCinema = async (req, res) => {
       });
     }
 
-    res.json({
+    res.status(200).json({
       success: true,
       data: cinema
     });
@@ -128,7 +127,6 @@ exports.updateCinema = async (req, res) => {
   }
 };
 
-// ADMIN: Delete cinema (also deletes its shows)
 exports.deleteCinema = async (req, res) => {
   try {
     const cinema = await Cinema.findByIdAndDelete(req.params.id);
@@ -140,10 +138,9 @@ exports.deleteCinema = async (req, res) => {
       });
     }
 
-    // Delete related shows
     await Show.deleteMany({ cinemaId: cinema._id });
 
-    res.json({
+    res.status(200).json({
       success: true,
       message: "Cinema and related shows deleted"
     });

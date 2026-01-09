@@ -1,159 +1,336 @@
 import { useState, useEffect, useMemo } from "react"
+import { toast } from "react-toastify"
 
-const SEAT_PRICE = 800 // ₹
+const SEAT_PRICE = 800
 
-export default function SeatLayout({
-  seats = [],
-  cinemaId,
+const SeatLayout = ({
   showId,
+  cinemaId,
   hallName,
+  seats: initialSeats = [],
+  movieTitle,
+  cinemaName,
+  showTime,
+  showDate,
   onSeatSelect,
   onConfirm,
-}) {
+  isBooking = false,
+}) => {
+  const [seats, setSeats] = useState([])
   const [selectedSeats, setSelectedSeats] = useState([])
+
+  /* ===== RECOMMENDATION STATE ===== */
   const [recommendMode, setRecommendMode] = useState(null)
   const [loadingReco, setLoadingReco] = useState(false)
-  const [recommendedSeatsList, setRecommendedSeatsList] = useState([])
+  const [recommendedGroups, setRecommendedGroups] = useState([])
+  const [peopleCount, setPeopleCount] = useState(2)
 
-  /* ================= ROWS ================= */
+  /* ===== AUTH CHECK ===== */
+  const token = localStorage.getItem("token")
+  const isLoggedIn = !!token
+
+  /* ================= SYNC SEATS ================= */
+  useEffect(() => {
+    console.log("SeatLayout received initialSeats:", initialSeats)
+    if (Array.isArray(initialSeats)) {
+      setSeats(initialSeats)
+      console.log("SeatLayout seats set to:", initialSeats.length, "seats")
+    } else {
+      console.warn("SeatLayout: initialSeats is not an array:", initialSeats)
+      setSeats([])
+    }
+  }, [initialSeats])
+
+  /* ===== ROWS ===== */
   const rows = useMemo(() => {
-    const uniqueRows = [...new Set(seats.map(s => s.row))]
-    return uniqueRows.sort()
+    if (!seats.length) {
+      console.log("SeatLayout: No seats, returning empty rows")
+      return []
+    }
+
+    const uniqueRows = [...new Set(seats.map((s) => s.row))]
+      .filter(Boolean)
+      .sort()
+    
+    console.log("SeatLayout: Rows calculated:", uniqueRows)
+    return uniqueRows
   }, [seats])
 
   /* ================= SEATS BY ROW ================= */
   const seatsByRow = useMemo(() => {
+    if (!rows.length) return {}
+
     const map = {}
-    rows.forEach(row => {
+    rows.forEach((row) => {
       map[row] = seats
-        .filter(s => s.row === row)
+        .filter((s) => s.row === row)
         .sort((a, b) => a.column - b.column)
     })
     return map
   }, [rows, seats])
 
+  /* ================= CHECK IF RECOMMENDED ================= */
+  const isRecommendedSeat = (seatId) => {
+    if (!recommendMode || recommendedGroups.length === 0) return false
+
+    return recommendedGroups.some((group) =>
+      group.seats.some((s) => s.seatId.toString() === seatId.toString())
+    )
+  }
+
   /* ================= SEAT STATUS ================= */
-  const getSeatStatus = seat => {
-    if (seat.status !== "AVAILABLE") return "unavailable"
-    if (selectedSeats.find(s => s._id === seat._id)) return "selected"
+  const getSeatStatus = (seat) => {
+    if (seat.status === "BOOKED") return "booked"
+    if (selectedSeats.some((s) => s._id === seat._id)) return "selected"
+    if (isRecommendedSeat(seat._id)) return "recommended"
     return "available"
   }
 
-  /* ================= TOGGLE SEAT ================= */
-  const handleSeatToggle = seat => {
-    setSelectedSeats(prev =>
-      prev.find(s => s._id === seat._id)
-        ? prev.filter(s => s._id !== seat._id)
+  /* ================= TOGGLE SEAT (Clear recommendations on manual click) ================= */
+  const handleSeatClick = (seat) => {
+    if (seat.status === "BOOKED") return
+
+    // Check if user is logged in
+    if (!isLoggedIn) {
+      toast.warning("Please log in to book tickets", {
+        style: {
+          background: "#fef3c7",
+          color: "#92400e",
+          border: "1px solid #fcd34d",
+        },
+        hideProgressBar: true,
+      })
+      return
+    }
+
+    // Clear recommendations when user manually clicks a seat
+    if (recommendMode) {
+      setRecommendMode(null)
+      setRecommendedGroups([])
+    }
+
+    setSelectedSeats((prev) =>
+      prev.some((s) => s._id === seat._id)
+        ? prev.filter((s) => s._id !== seat._id)
         : [...prev, seat]
     )
   }
 
-  /* ================= EMIT SELECTED ================= */
+  /* ================= EMIT ================= */
   useEffect(() => {
-    onSeatSelect(selectedSeats)
+    onSeatSelect?.(selectedSeats)
   }, [selectedSeats, onSeatSelect])
 
   /* ================= FETCH RECOMMENDATION ================= */
-  const fetchRecommendedSeats = async (mode, count = 2) => {
+  const fetchRecommendedSeats = async (mode) => {
+    // Check if user is logged in
+    if (!isLoggedIn) {
+      toast.warning("Please log in to book tickets", {
+        style: {
+          background: "#fef3c7",
+          color: "#92400e",
+          border: "1px solid #fcd34d",
+        },
+        hideProgressBar: true,
+      })
+      return
+    }
+
+    if (recommendMode === mode) {
+      setRecommendMode(null)
+      setRecommendedGroups([])
+      setSelectedSeats([])
+      return
+    }
+
     try {
       setLoadingReco(true)
+      setRecommendMode(mode)
+      setSelectedSeats([])
 
-      const res = await fetch(
-        `http://localhost:3000/api/seats/recommend?cinemaId=${cinemaId}&showId=${showId}&hallName=${hallName}&count=${count}&mode=${mode}`
-      )
+      const url = `http://localhost:3000/api/seats/recommend?cinemaId=${cinemaId}&showId=${showId}&hallName=${encodeURIComponent(hallName)}&count=${peopleCount}&mode=${mode}`
+      console.log("Fetching recommendations from:", url)
 
+      const res = await fetch(url)
       const data = await res.json()
+      
+      console.log("Recommendation API response:", data)
 
-      if (data.success && data.recommendedSeats) {
-        // Store the list of recommended seats for display
-        setRecommendedSeatsList(data.recommendedSeats)
-        
-        // Auto-select the first recommendation (optional - you can remove this if you want users to click)
-        // For "best" mode, don't auto-select, let users choose
-        if (mode === "row" || mode === "ROW") {
-          const recommended = seats.filter(seat =>
-            data.recommendedSeats.some(r => r.seatId === seat._id)
-          )
-          setSelectedSeats(recommended)
-        }
+      if (!res.ok || !data.success) {
+        console.log("API returned error:", data.message)
+        alert(data.message || "No seats available for recommendation")
+        setRecommendedGroups([])
+        setRecommendMode(null)
+        return
       }
+
+      // Handle both response formats
+      const groups = data.recommendedGroups || []
+      console.log("Setting recommended groups:", groups)
+      setRecommendedGroups(groups)
     } catch (err) {
-      console.error("Recommendation failed", err)
+      console.error("Recommendation fetch error:", err)
+      setRecommendMode(null)
+      setRecommendedGroups([])
     } finally {
       setLoadingReco(false)
     }
   }
 
-  /* ================= HANDLE RECOMMENDATION CLICK ================= */
-  const handleRecommendationClick = (recommendedSeat) => {
-    const seat = seats.find(s => s._id === recommendedSeat.seatId)
-    if (seat && seat.status === "AVAILABLE") {
-      handleSeatToggle(seat)
+  /* ================= GROUP CLICK (Keep recommendations visible) ================= */
+  const handleGroupClick = (groupSeats) => {
+    // Check if user is logged in
+    if (!isLoggedIn) {
+      toast.warning("Please log in to book tickets", {
+        style: {
+          background: "#fef3c7",
+          color: "#92400e",
+          border: "1px solid #fcd34d",
+        },
+        hideProgressBar: true,
+      })
+      return
+    }
+
+    const ids = groupSeats.map((s) => s.seatId.toString())
+
+    const matched = seats.filter((s) =>
+      ids.some((id) => id === s._id.toString())
+    )
+
+    // Don't clear recommendations when clicking a recommended group
+    setSelectedSeats(matched)
+  }
+
+  /* ================= CONFIRM BOOKING ================= */
+  const handleConfirmBooking = async () => {
+    // Check if user is logged in
+    if (!isLoggedIn) {
+      toast.warning("Please log in to book tickets", {
+        style: {
+          background: "#fef3c7",
+          color: "#92400e",
+          border: "1px solid #fcd34d",
+        },
+        hideProgressBar: true,
+      })
+      return
+    }
+
+    try {
+      const res = await onConfirm()
+      if (!res?.success) {
+        console.warn("Booking failed:", res)
+      } else {
+        setSelectedSeats([])
+        setRecommendMode(null)
+        setRecommendedGroups([])
+      }
+    } catch (error) {
+      console.error("Booking confirmation error:", error)
     }
   }
 
   const totalPrice = selectedSeats.length * SEAT_PRICE
 
+  /* ================= SEAT ICON SVG ================= */
+  const SeatIcon = ({ status }) => (
+    <svg viewBox="0 0 24 24" fill="none" className="w-full h-full">
+      <path
+        d="M4 12h1.5v7H4v-7zm14.5 0H20v7h-1.5v-7zM7 10c0-1.1.9-2 2-2h6c1.1 0 2 .9 2 2v9H7v-9z"
+        stroke="currentColor"
+        strokeWidth="1"
+        fill="none"
+      />
+      <rect x="6" y="19" width="12" height="1.5" rx="0.5" fill="currentColor" />
+    </svg>
+  )
+
   /* ================= UI ================= */
   return (
-    <div className="flex flex-row gap-8 p-6 md:p-12 max-w-7xl mx-auto">
-      {/* ================= LEFT ================= */}
-      <div className="flex-1 space-y-8">
-        <div>
-          <h1 className="text-4xl font-light mb-2">Select Your Seat</h1>
-          <p className="text-muted-foreground">
-            Choose your perfect spot for an unforgettable experience
-          </p>
-        </div>
+    <div className="min-h-screen bg-neutral-950 p-8">
+      <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-10">
 
-        {/* SCREEN */}
-        <div className="space-y-8">
-          <div className="flex justify-center">
-            <div className="w-3/4 h-2 bg-gradient-to-b from-muted/60 to-muted/30 rounded-full blur-sm" />
-          </div>
-          <p className="text-center text-sm uppercase tracking-widest text-muted-foreground">
-            Screen
+        {/* LEFT */}
+        <div className="flex-1 space-y-8">
+          <h1 className="text-4xl font-semibold text-red-500">
+            Select Your Seats
+          </h1>
+
+          <p className="text-neutral-400 -mt-4">
+            {movieTitle} • {cinemaName} • {showTime} • {showDate}
           </p>
+
+          {/* SCREEN */}
+          <div className="flex flex-col items-center space-y-2">
+            <div className="w-3/4 h-10 border-t-4 border-red-500 rounded-t-full" />
+            <span className="text-xs tracking-widest text-neutral-400">
+              SCREEN
+            </span>
+          </div>
+
+          {/* LEGEND */}
+          <div className="flex gap-6 justify-center text-xs text-neutral-300">
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 bg-neutral-800 rounded"></div>
+              Available
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 bg-red-600 rounded"></div>
+              Selected
+            </div>
+            {recommendMode && (
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-5 bg-amber-500 rounded"></div>
+                Recommended
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 bg-neutral-700 rounded"></div>
+              Booked
+            </div>
+          </div>
 
           {/* SEATS */}
-          <div className="flex gap-8 justify-center">
-            {/* ROW LABELS */}
-            <div className="flex flex-col pt-1">
-              {rows.map(row => (
+          <div className="flex justify-center gap-6 bg-neutral-900 p-6 rounded-xl">
+            <div className="flex flex-col gap-2">
+              {rows.map((row) => (
                 <div
                   key={row}
-                  className="h-12 w-6 flex items-center justify-center text-sm text-muted-foreground"
+                  className="h-14 w-6 text-neutral-500 flex items-center justify-center text-sm"
                 >
                   {row}
                 </div>
               ))}
             </div>
 
-            {/* GRID */}
-            <div className="space-y-1">
-              {rows.map(row => (
-                <div key={row} className="flex gap-1">
-                  {seatsByRow[row].map(seat => {
+            <div className="space-y-2">
+              {rows.map((row) => (
+                <div key={row} className="flex gap-2">
+                  {seatsByRow[row].map((seat) => {
                     const status = getSeatStatus(seat)
 
                     return (
                       <button
                         key={seat._id}
-                        disabled={status === "unavailable"}
-                        onClick={() => handleSeatToggle(seat)}
-                        className={`
-                          w-12 h-12 rounded-md text-xs transition-all
-                          ${seat.isBestRow ? "ring-2 ring-yellow-400" : ""}
-                          ${
-                            status === "available"
-                              ? "bg-muted hover:bg-primary/20 border"
-                              : status === "selected"
-                              ? "bg-primary text-white scale-105"
-                              : "bg-muted/50 opacity-50 cursor-not-allowed"
-                          }
+                        disabled={status === "booked"}
+                        onClick={() => handleSeatClick(seat)}
+                        className={`relative w-14 h-14 rounded-lg transition-all group
+                          ${status === "available" && "bg-neutral-800 hover:bg-neutral-700 text-neutral-400"}
+                          ${status === "selected" && "bg-red-600 text-white"}
+                          ${status === "recommended" && "bg-amber-500 hover:bg-amber-600 text-white"}
+                          ${status === "booked" && "bg-neutral-700 text-neutral-600 cursor-not-allowed opacity-50"}
                         `}
+                        title={status === "booked" ? "This seat is already booked" : seat.seatNumber}
                       >
-                        {status === "selected" ? "✓" : seat.seatNumber}
+                        <div className="p-2">
+                          <SeatIcon status={status} />
+                        </div>
+                        <span className={`absolute inset-0 flex items-center justify-center text-[10px] font-medium
+                          ${status === "available" ? "opacity-0 group-hover:opacity-100" : "opacity-100"}
+                        `}>
+                          {seat.seatNumber}
+                        </span>
                       </button>
                     )
                   })}
@@ -162,106 +339,111 @@ export default function SeatLayout({
             </div>
           </div>
         </div>
-      </div>
 
-      {/* ================= RIGHT PANEL ================= */}
-      <div className="w-80">
-        <div className="bg-card border rounded-lg p-6 space-y-6 sticky top-6">
-          <h2 className="text-lg font-semibold uppercase">Recommendations</h2>
+        {/* RIGHT */}
+        <div className="w-full lg:w-96 bg-neutral-900 p-6 rounded-xl space-y-4">
+          <h2 className="text-lg font-semibold text-red-500">
+            Seat Recommendation
+          </h2>
 
-          <div className="space-y-2">
-            <button
-              disabled={loadingReco}
-              onClick={() => {
-                setRecommendMode("BEST")
-                fetchRecommendedSeats("best", 2)
-              }}
-              className={`w-full py-2 rounded font-medium ${
-                recommendMode === "BEST"
-                  ? "bg-primary text-white"
-                  : "bg-muted"
-              }`}
-            >
-              Best Seats
-            </button>
-
-            <button
-              disabled={loadingReco}
-              onClick={() => {
-                setRecommendMode("ROW")
-                fetchRecommendedSeats("row", selectedSeats.length || 2)
-              }}
-              className={`w-full py-2 rounded font-medium ${
-                recommendMode === "ROW"
-                  ? "bg-primary text-white"
-                  : "bg-muted"
-              }`}
-            >
-              Same Row
-            </button>
+          <div>
+            <label className="text-xs text-neutral-400 block mb-1">
+              Number of seats
+            </label>
+            <input
+              type="number"
+              min="1"
+              max="10"
+              value={peopleCount}
+              onChange={(e) => setPeopleCount(+e.target.value || 1)}
+              className="w-full bg-neutral-800 px-3 py-2 rounded text-white"
+            />
           </div>
 
-          {/* RECOMMENDED SEATS LIST */}
-          {recommendedSeatsList.length > 0 && (
-            <div className="space-y-3">
-              <div className="flex flex-wrap gap-2">
-                {recommendedSeatsList.map((recSeat) => {
-                  const seat = seats.find(s => s._id === recSeat.seatId)
-                  const isSelected = selectedSeats.some(s => s._id === recSeat.seatId)
-                  const isAvailable = seat && seat.status === "AVAILABLE"
-                  
-                  return (
-                    <button
-                      key={recSeat.seatId}
-                      disabled={!isAvailable}
-                      onClick={() => handleRecommendationClick(recSeat)}
-                      className={`
-                        px-3 py-1.5 rounded-md text-xs font-medium transition-all
-                        ${
-                          isSelected
-                            ? "bg-primary text-white"
-                            : isAvailable
-                            ? "bg-muted hover:bg-primary/20 border cursor-pointer"
-                            : "bg-muted/50 opacity-50 cursor-not-allowed"
-                        }
-                      `}
-                    >
-                      {recSeat.label || `${recSeat.row}${recSeat.column}`}
-                    </button>
-                  )
-                })}
+          <button
+            onClick={() => fetchRecommendedSeats("best")}
+            disabled={loadingReco}
+            className={`w-full py-2 rounded transition ${
+              recommendMode === "best"
+                ? "bg-red-600"
+                : "bg-neutral-800 hover:bg-neutral-700"
+            } ${loadingReco ? "opacity-50 cursor-not-allowed" : ""}`}
+          >
+            {loadingReco && recommendMode === "best"
+              ? "Loading..."
+              : "Best Seats in Hall"}
+          </button>
+
+          <button
+            onClick={() => fetchRecommendedSeats("row")}
+            disabled={loadingReco}
+            className={`w-full py-2 rounded transition ${
+              recommendMode === "row"
+                ? "bg-red-600"
+                : "bg-neutral-800 hover:bg-neutral-700"
+            } ${loadingReco ? "opacity-50 cursor-not-allowed" : ""}`}
+          >
+            {loadingReco && recommendMode === "row"
+              ? "Loading..."
+              : "Best Seats in Same Row"}
+          </button>
+
+          {recommendedGroups.length > 0 && (
+            <div className="pt-2 space-y-2">
+              <p className="text-xs text-neutral-400">
+                {recommendedGroups.length} option
+                {recommendedGroups.length > 1 ? "s" : ""} found - Click to
+                select:
+              </p>
+              <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
+                {recommendedGroups.map((g, i) => (
+                  <button
+                    key={i}
+                    onClick={() => handleGroupClick(g.seats)}
+                    className="w-full text-sm bg-neutral-800 hover:bg-neutral-700 py-2 px-3 rounded transition text-left"
+                  >
+                    <span className="text-amber-500 font-semibold">
+                      Row {g.row}
+                    </span>
+                    <span className="text-neutral-400">
+                      {" "}
+                      • {g.seats.map((s) => s.label).join(", ")}
+                    </span>
+                  </button>
+                ))}
               </div>
             </div>
           )}
 
-          {loadingReco && (
-            <div className="text-sm text-muted-foreground">Loading recommendations...</div>
-          )}
+          <div className="border-t border-neutral-800 pt-4">
+            <h2 className="text-lg font-semibold text-red-500 mb-3">
+              Order Summary
+            </h2>
 
-          {/* ORDER SUMMARY */}
-          <div className="border-t pt-4 space-y-4">
-            <h2 className="text-lg font-semibold">Order Summary</h2>
             {selectedSeats.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No seats selected</p>
+              <p className="text-sm text-neutral-500 italic mb-4">
+                No seats selected
+              </p>
             ) : (
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Seats ({selectedSeats.length})</span>
+              <>
+                <p className="text-sm text-neutral-300 mb-2">
+                  <span className="text-neutral-500">Seats:</span>{" "}
+                  {selectedSeats.map((s) => s.seatNumber).join(", ")}
+                </p>
+
+                <div className="flex justify-between text-red-500 font-semibold text-lg mb-4">
+                  <span>Total</span>
                   <span>₹{totalPrice}</span>
                 </div>
-              </div>
+              </>
             )}
 
             <button
-              disabled={selectedSeats.length === 0}
-              onClick={onConfirm}
-              className={`w-full py-3 rounded-lg font-medium ${
-                selectedSeats.length === 0
-                  ? "bg-muted cursor-not-allowed"
-                  : "bg-primary text-white hover:opacity-90"
-              }`}
+              disabled={!selectedSeats.length || isBooking}
+              onClick={handleConfirmBooking}
+              className="w-full bg-red-600 hover:bg-red-700 py-3 rounded transition disabled:opacity-40 disabled:cursor-not-allowed font-semibold"
             >
-              Confirm Booking
+              {isBooking ? "Processing..." : "Confirm Booking"}
             </button>
           </div>
         </div>
@@ -269,3 +451,5 @@ export default function SeatLayout({
     </div>
   )
 }
+
+export default SeatLayout
