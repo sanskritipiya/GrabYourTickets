@@ -3,8 +3,8 @@ const mongoose = require("mongoose");
 
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
-/* ================= ADD SEATS (SMART) ================= */
-/* ================= ADD SEATS (SMART) ================= */
+/* ================= ADD SEATS  ================= */
+
 exports.addSeats = async (req, res) => {
   try {
     const { cinemaId, showId, movieId, movieName, hallName, seats } = req.body;
@@ -46,8 +46,8 @@ exports.addSeats = async (req, res) => {
       return {
         cinemaId,
         showId,
-        movieId,        // ✅ ADD THIS
-        movieName,      // ✅ ADD THIS
+        movieId,        
+        movieName,      
         hallName,
         row: rowLetter,
         column: s.column,

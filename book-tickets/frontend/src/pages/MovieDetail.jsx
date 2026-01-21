@@ -46,9 +46,10 @@ const MovieDetail = () => {
   const activeMovie = isUpcoming ? upcoming : movie
   const activeMovieId = activeMovie?._id || activeMovie?.id
 
+
+
   /* ---------- FETCH CINEMAS WITH SHOWS ---------- */
   const fetchCinemasAndShows = async () => {
-    // Check if movie ID is available
     if (!activeMovieId) {
       console.error("Movie ID not available yet")
       return
@@ -59,7 +60,6 @@ const MovieDetail = () => {
     try {
       setLoadingShows(true)
 
-      // 1️⃣ Fetch all shows for this movie directly (more efficient)
       const showsRes = await axios.get(
         `http://localhost:3000/api/shows?movieId=${activeMovieId}`
       )
@@ -78,17 +78,14 @@ const MovieDetail = () => {
         return
       }
 
-      // 2️⃣ Get all cinemas to get cinema details
       const cinemaRes = await axios.get(
         "http://localhost:3000/api/cinemas"
       )
 
       const cinemaList = cinemaRes.data.data || []
       
-      // 3️⃣ Group shows by cinema
       const cinemaMap = new Map()
       
-      // Initialize map with all cinemas
       cinemaList.forEach(cinema => {
         cinemaMap.set(String(cinema._id), {
           ...cinema,
@@ -96,7 +93,6 @@ const MovieDetail = () => {
         })
       })
 
-      // Group shows by cinema
       allShows.forEach(show => {
         const cinemaId = show.cinemaId?._id || show.cinemaId
         const cinemaIdStr = String(cinemaId)
@@ -104,7 +100,6 @@ const MovieDetail = () => {
         if (cinemaMap.has(cinemaIdStr)) {
           cinemaMap.get(cinemaIdStr).shows.push(show)
         } else {
-          // If cinema not found in list, create entry
           console.warn(`Cinema ${cinemaIdStr} not found in cinema list`)
           cinemaMap.set(cinemaIdStr, {
             _id: cinemaId,
@@ -115,7 +110,6 @@ const MovieDetail = () => {
         }
       })
 
-      // Convert map to array and filter out cinemas with no shows
       const cinemaWithShows = Array.from(cinemaMap.values())
         .filter(cinema => cinema.shows.length > 0)
 
@@ -137,7 +131,6 @@ const MovieDetail = () => {
       return
     }
 
-    // Only show picker if movie is loaded
     if (!activeMovieId) {
       console.error("Cannot fetch shows: Movie ID not available")
       return
@@ -222,14 +215,30 @@ const MovieDetail = () => {
               </div>
             )}
 
-            {!isUpcoming && (
-              <button
-                onClick={handleBookNow}
-                className="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 px-8 py-4 rounded-lg font-semibold text-white text-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
-              >
-                {showPicker ? "Hide Showtimes" : "Book Now"}
-              </button>
-            )}
+            <div className="flex gap-4 flex-wrap items-center">
+              {!isUpcoming && (
+                <button
+                  onClick={handleBookNow}
+                  className="bg-red-500 hover:bg-red-600 px-10 py-4 rounded-full font-semibold text-white text-lg transition-all duration-300"
+                >
+                  {showPicker ? "Hide Showtimes" : "Book Now"}
+                </button>
+              )}
+              
+              {activeMovie.trailerUrl && (
+                <a
+                  href={activeMovie.trailerUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="border-2 border-gray-500 hover:border-gray-400 bg-transparent hover:bg-gray-800/30 px-10 py-4 rounded-full font-semibold text-white text-lg transition-all duration-300 inline-flex items-center gap-3"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />
+                  </svg>
+                  Watch Trailer
+                </a>
+              )}
+            </div>
           </div>
         </div>
 
